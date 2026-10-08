@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import logo from '@/assets/vibeeco-logo.png'
+import logo from '@/assets/vibeeco-logo.svg'
 import fundo from '@/assets/fundo-folhas.png'
 
 const login = ref('')
@@ -81,11 +81,15 @@ async function entrar() {
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 .tela {
-  min-height: 100vh;
+  /* Ocupa a janela inteira, ignorando limites de largura do #app */
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 76px;
   padding: 32px 16px;
   box-sizing: border-box;
@@ -98,6 +102,14 @@ async function entrar() {
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
+}
+
+/* margin auto centraliza o conjunto na vertical sem cortar o topo em telas baixas */
+.marca {
+  margin: auto auto 0;
+}
+.cartao {
+  margin: 0 auto auto;
 }
 
 /* Marca */
