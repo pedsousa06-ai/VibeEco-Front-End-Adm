@@ -6,20 +6,27 @@ import fundo from '@/assets/fundo-folhas.png'
 
 const router = useRouter()
 
-const login = ref('')
-const senha = ref('')
+const novaSenha = ref('')
+const confirmarSenha = ref('')
+const erro = ref('')
 const carregando = ref(false)
 
-function primeiroAcesso() {
-  router.push('/redefinir-senha')
-}
+async function salvar() {
+  erro.value = ''
 
-async function entrar() {
-  if (!login.value || !senha.value) return
+  if (novaSenha.value.length < 8) {
+    erro.value = 'A senha precisa ter pelo menos 8 caracteres.'
+    return
+  }
+  if (novaSenha.value !== confirmarSenha.value) {
+    erro.value = 'As senhas não conferem.'
+    return
+  }
+
   carregando.value = true
   try {
-    // TODO: chamar sua API de autenticação aqui
-    console.log('login:', login.value)
+    // TODO: chamar sua API para salvar a nova senha
+    router.push('/login')
   } finally {
     carregando.value = false
   }
@@ -33,47 +40,55 @@ async function entrar() {
       <p class="subtitulo">Painel Administrativo</p>
     </header>
 
-    <form class="cartao" @submit.prevent="entrar">
-      <h1>Entrar na plataforma</h1>
+    <form class="cartao" @submit.prevent="salvar">
+      <svg class="alerta" viewBox="0 0 64 58" aria-hidden="true">
+        <path
+          d="M29.2 4.5a3.5 3.5 0 0 1 5.6 0l27 46.5a3.5 3.5 0 0 1-2.8 5.2H5a3.5 3.5 0 0 1-2.8-5.2l27-46.5Z"
+          fill="#FFB400"
+        />
+        <rect x="29.5" y="20" width="5" height="19" rx="2.5" fill="#333" />
+        <circle cx="32" cy="46" r="3" fill="#333" />
+      </svg>
+
+      <h1>Atenção!</h1>
+      <p class="aviso">Para continuar, é necessário trocar a senha padrão.</p>
 
       <label class="campo">
-        <span>E-mail ou CNPJ</span>
-        <div class="entrada">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
-            <rect x="2" y="5" width="20" height="14" rx="1.5" />
-            <path d="m2.5 6 9.5 7 9.5-7" />
-          </svg>
-          <input
-            v-model="login"
-            type="text"
-            autocomplete="username"
-            placeholder="seu@gmail.com ou matricula"
-          />
-        </div>
-      </label>
-
-      <label class="campo">
-        <span>Senha</span>
+        <span>Nova senha</span>
         <div class="entrada">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
             <rect x="5" y="10" width="14" height="11" rx="1" />
             <path d="M8 10V7a4 4 0 0 1 8 0v3" />
           </svg>
           <input
-            v-model="senha"
+            v-model="novaSenha"
             type="password"
-            autocomplete="current-password"
+            autocomplete="new-password"
             placeholder="Digite a sua senha"
           />
         </div>
       </label>
 
-      <a href="#" class="primeiro-acesso" @click.prevent="primeiroAcesso">
-        Primeiro Acesso? Clique aqui
-      </a>
+      <label class="campo">
+        <span>Confirmar nova senha</span>
+        <div class="entrada">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+            <rect x="5" y="10" width="14" height="11" rx="1" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
+          <input
+            v-model="confirmarSenha"
+            type="password"
+            autocomplete="new-password"
+            placeholder="Digite a sua senha"
+          />
+        </div>
+      </label>
+
+      <p v-if="erro" class="erro" role="alert">{{ erro }}</p>
 
       <button type="submit" :disabled="carregando">
-        {{ carregando ? 'Entrando...' : 'Entrar' }}
+        {{ carregando ? 'Salvando...' : 'Salvar' }}
       </button>
     </form>
   </main>
@@ -83,7 +98,6 @@ async function entrar() {
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 .tela {
-  /* Ocupa a janela inteira, ignorando limites de largura do #app */
   position: fixed;
   inset: 0;
   width: 100%;
@@ -92,11 +106,10 @@ async function entrar() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 76px;
+  gap: 60px;
   padding: 32px 16px;
   box-sizing: border-box;
   font-family: 'Inter', system-ui, sans-serif;
-  /* A imagem é semitransparente: ela se mistura com o verde escuro por baixo */
   background-color: #021a0a;
   background-image:
     linear-gradient(rgba(0, 25, 10, 0.55), rgba(0, 25, 10, 0.55)),
@@ -106,19 +119,17 @@ async function entrar() {
   background-repeat: no-repeat;
 }
 
-/* margin auto centraliza o conjunto na vertical sem cortar o topo em telas baixas */
+/* margin auto centraliza o conjunto sem cortar o topo em telas baixas */
 .marca {
   margin: auto auto 0;
+  text-align: center;
+  color: #fff;
 }
 .cartao {
   margin: 0 auto auto;
 }
 
 /* Marca */
-.marca {
-  text-align: center;
-  color: #fff;
-}
 .logo {
   display: block;
   width: 380px;
@@ -137,22 +148,34 @@ async function entrar() {
   width: 100%;
   max-width: 549px;
   box-sizing: border-box;
-  padding: 32px 54px 55px 37px;
+  padding: 36px 54px 55px;
   background: #fff;
   border-radius: 28px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+.alerta {
+  width: 60px;
+  height: 54px;
 }
 .cartao h1 {
-  margin: 0 0 40px;
+  margin: 8px 0 10px;
   font-size: 24px;
   font-weight: 600;
   color: #000;
 }
+.aviso {
+  max-width: 270px;
+  margin: 0 auto 30px;
+  font-size: 16px;
+  line-height: 1.3;
+  color: #111;
+}
 
 .campo {
   display: block;
-  margin-left: 17px;
-  margin-bottom: 18px;
+  margin-bottom: 26px;
+  text-align: left;
 }
 .campo > span {
   display: block;
@@ -196,28 +219,18 @@ async function entrar() {
   color: #8f8f8f;
 }
 
-.primeiro-acesso {
-  display: inline-block;
-  margin: 2px 0 0 20px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1ba52f;
-  text-decoration: none;
-}
-.primeiro-acesso:hover {
-  text-decoration: underline;
-}
-.primeiro-acesso:focus-visible {
-  outline: 2px solid #1ba52f;
-  outline-offset: 3px;
-  border-radius: 2px;
+.erro {
+  margin: -10px 0 14px;
+  font-size: 14px;
+  text-align: left;
+  color: #c62828;
 }
 
 button {
   display: block;
-  width: calc(100% - 17px);
+  width: 100%;
   height: 51px;
-  margin: 18px 0 0 17px;
+  margin-top: 9px;
   border: 0;
   border-radius: 8px;
   background: #07843f;
@@ -248,17 +261,7 @@ button:disabled {
     width: 270px;
   }
   .cartao {
-    padding: 24px 20px 32px;
-  }
-  .campo,
-  button {
-    margin-left: 0;
-  }
-  .primeiro-acesso {
-    margin-left: 4px;
-  }
-  button {
-    width: 100%;
+    padding: 28px 20px 32px;
   }
 }
 </style>
