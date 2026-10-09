@@ -1,32 +1,26 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+// import { useRouter } from 'vue-router'
 import logo from '@/assets/vibeeco-logo.svg'
-import fundo from '@/assets/fundo-folhas.png'
 
-const router = useRouter()
+// const router = useRouter()
 
-const novaSenha = ref('')
-const confirmarSenha = ref('')
-const erro = ref('')
+const login = ref('')
+const senha = ref('')
 const carregando = ref(false)
 
-async function salvar() {
-  erro.value = ''
+function esqueciSenha() {
+  // TODO: levar para a tela de recuperação de senha
+  console.log('esqueci minha senha')
+}
 
-  if (novaSenha.value.length < 8) {
-    erro.value = 'A senha precisa ter pelo menos 8 caracteres.'
-    return
-  }
-  if (novaSenha.value !== confirmarSenha.value) {
-    erro.value = 'As senhas não conferem.'
-    return
-  }
-
+async function entrar() {
+  if (!login.value || !senha.value) return
   carregando.value = true
   try {
-    // TODO: chamar sua API para salvar a nova senha
-    router.push('/login')
+    // TODO: chamar sua API de autenticação
+    // router.push('/painel')
+    console.log('login:', login.value)
   } finally {
     carregando.value = false
   }
@@ -34,61 +28,53 @@ async function salvar() {
 </script>
 
 <template>
-  <main class="tela" :style="{ '--fundo': `url(${fundo})` }">
+  <main class="tela">
     <header class="marca">
       <img class="logo" :src="logo" alt="VibeEco" />
       <p class="subtitulo">Painel Administrativo</p>
     </header>
 
-    <form class="cartao" @submit.prevent="salvar">
-      <svg class="alerta" viewBox="0 0 64 58" aria-hidden="true">
-        <path
-          d="M29.2 4.5a3.5 3.5 0 0 1 5.6 0l27 46.5a3.5 3.5 0 0 1-2.8 5.2H5a3.5 3.5 0 0 1-2.8-5.2l27-46.5Z"
-          fill="#FFB400"
-        />
-        <rect x="29.5" y="20" width="5" height="19" rx="2.5" fill="#333" />
-        <circle cx="32" cy="46" r="3" fill="#333" />
-      </svg>
-
-      <h1>Atenção!</h1>
-      <p class="aviso">Para continuar, é necessário trocar a senha padrão.</p>
+    <form class="cartao" @submit.prevent="entrar">
+      <h1>Entrar na plataforma</h1>
 
       <label class="campo">
-        <span>Nova senha</span>
+        <span>E-mail ou Matrícula</span>
+        <div class="entrada">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+            <rect x="2" y="5" width="20" height="14" rx="1.5" />
+            <path d="m2.5 6 9.5 7 9.5-7" />
+          </svg>
+          <input
+            v-model="login"
+            type="text"
+            autocomplete="username"
+            placeholder="seu@gmail.com ou matricula"
+          />
+        </div>
+      </label>
+
+      <label class="campo">
+        <span>Senha</span>
         <div class="entrada">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
             <rect x="5" y="10" width="14" height="11" rx="1" />
             <path d="M8 10V7a4 4 0 0 1 8 0v3" />
           </svg>
           <input
-            v-model="novaSenha"
+            v-model="senha"
             type="password"
-            autocomplete="new-password"
+            autocomplete="current-password"
             placeholder="Digite a sua senha"
           />
         </div>
       </label>
 
-      <label class="campo">
-        <span>Confirmar nova senha</span>
-        <div class="entrada">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
-            <rect x="5" y="10" width="14" height="11" rx="1" />
-            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-          </svg>
-          <input
-            v-model="confirmarSenha"
-            type="password"
-            autocomplete="new-password"
-            placeholder="Digite a sua senha"
-          />
-        </div>
-      </label>
-
-      <p v-if="erro" class="erro" role="alert">{{ erro }}</p>
+      <div class="esqueci-linha">
+        <a href="#" class="esqueci" @click.prevent="esqueciSenha">Esqueci minha senha</a>
+      </div>
 
       <button type="submit" :disabled="carregando">
-        {{ carregando ? 'Salvando...' : 'Salvar' }}
+        {{ carregando ? 'Entrando...' : 'Entrar' }}
       </button>
     </form>
   </main>
@@ -106,17 +92,15 @@ async function salvar() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 60px;
+  gap: 76px;
   padding: 32px 16px;
   box-sizing: border-box;
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: #021a0a;
+  /* Esta tela não usa a foto de folhas, só o degradê verde escuro */
+  background-color: #011a0c;
   background-image:
-    linear-gradient(rgba(0, 25, 10, 0.55), rgba(0, 25, 10, 0.55)),
-    var(--fundo);
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
+    radial-gradient(circle at 100% 0%, #04512a 0%, rgba(4, 81, 42, 0) 60%),
+    linear-gradient(160deg, #013018 0%, #012211 50%, #011a0c 100%);
 }
 
 /* margin auto centraliza o conjunto sem cortar o topo em telas baixas */
@@ -148,34 +132,22 @@ async function salvar() {
   width: 100%;
   max-width: 549px;
   box-sizing: border-box;
-  padding: 36px 54px 55px;
+  padding: 32px 54px 55px 37px;
   background: #fff;
   border-radius: 28px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  text-align: center;
-}
-.alerta {
-  width: 60px;
-  height: 54px;
 }
 .cartao h1 {
-  margin: 8px 0 10px;
+  margin: 0 0 40px;
   font-size: 24px;
   font-weight: 600;
   color: #000;
 }
-.aviso {
-  max-width: 270px;
-  margin: 0 auto 30px;
-  font-size: 16px;
-  line-height: 1.3;
-  color: #111;
-}
 
 .campo {
   display: block;
-  margin-bottom: 26px;
-  text-align: left;
+  margin-left: 17px;
+  margin-bottom: 18px;
 }
 .campo > span {
   display: block;
@@ -219,18 +191,30 @@ async function salvar() {
   color: #8f8f8f;
 }
 
-.erro {
-  margin: -10px 0 14px;
-  font-size: 14px;
-  text-align: left;
-  color: #c62828;
+.esqueci-linha {
+  margin: 2px 0 0 17px;
+  text-align: right;
+}
+.esqueci {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1ba52f;
+  text-decoration: none;
+}
+.esqueci:hover {
+  text-decoration: underline;
+}
+.esqueci:focus-visible {
+  outline: 2px solid #1ba52f;
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 button {
   display: block;
-  width: 100%;
+  width: calc(100% - 17px);
   height: 51px;
-  margin-top: 9px;
+  margin: 18px 0 0 17px;
   border: 0;
   border-radius: 8px;
   background: #07843f;
@@ -261,7 +245,15 @@ button:disabled {
     width: 270px;
   }
   .cartao {
-    padding: 28px 20px 32px;
+    padding: 24px 20px 32px;
+  }
+  .campo,
+  .esqueci-linha,
+  button {
+    margin-left: 0;
+  }
+  button {
+    width: 100%;
   }
 }
 </style>
