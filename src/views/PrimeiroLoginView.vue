@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import logo from '@/assets/vibeeco-logo.png'
+import logo from '@/assets/vibeeco-logo.svg'
 import fundo from '@/assets/fundo-folhas.png'
 
 const router = useRouter()
