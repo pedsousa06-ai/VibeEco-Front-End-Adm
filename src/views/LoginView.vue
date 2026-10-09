@@ -1,16 +1,16 @@
 <script setup>
 import { ref } from 'vue'
-// import { useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import logo from '@/assets/vibeeco-logo.svg'
 
-// const router = useRouter()
+const router = useRouter()
 
 const login = ref('')
 const senha = ref('')
 const carregando = ref(false)
 
 function esqueciSenha() {
-    router.push('/esqueci-senha')
+  router.push('/esqueci-senha')
 }
 
 async function entrar() {
