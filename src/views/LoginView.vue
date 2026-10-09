@@ -1,15 +1,17 @@
 <script setup>
 import { ref } from 'vue'
-import logo from '@/assets/vibeeco-logo.svg'
+import { useRouter } from 'vue-router'
+import logo from '@/assets/vibeeco-logo.png'
 import fundo from '@/assets/fundo-folhas.png'
+
+const router = useRouter()
 
 const login = ref('')
 const senha = ref('')
 const carregando = ref(false)
 
 function primeiroAcesso() {
-  // TODO: levar para a tela de primeiro acesso, ex.: router.push('/primeiro-acesso')
-  console.log('primeiro acesso')
+  router.push('/redefinir-senha')
 }
 
 async function entrar() {
