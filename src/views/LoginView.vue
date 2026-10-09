@@ -10,8 +10,7 @@ const senha = ref('')
 const carregando = ref(false)
 
 function esqueciSenha() {
-  // TODO: levar para a tela de recuperação de senha
-  console.log('esqueci minha senha')
+    router.push('/esqueci-senha')
 }
 
 async function entrar() {
