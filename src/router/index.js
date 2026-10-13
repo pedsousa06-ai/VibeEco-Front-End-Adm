@@ -7,30 +7,11 @@ import VerificarCodigoView from '@/views/VerificarCodigoView.vue'
 import NovaSenhaView from '@/views/NovaSenhaView.vue'
 import AdminLayout from '@/components/AdminLayout.vue'
 import InicioView from '@/views/InicioView.vue'
-import EmBrevePlaceholder from '@/views/EmBrevePlaceholder.vue'
 
 // Deixe false enquanto não houver API, para poder navegar pelo painel.
 // Quando o login estiver pronto, mude para true e salve o token em
 // localStorage com a chave 'vibeeco_token' após autenticar.
 const PROTEGER_ROTAS = false
-
-// Módulos que ainda não têm tela: todos usam o placeholder
-const emBreve = [
-  ['usuarios', 'Usuários'],
-  ['missoes', 'Missões'],
-  ['desafios', 'Desafios'],
-  ['conteudo', 'Conteúdo'],
-  ['configuracoes', 'Configurações'],
-  ['tipos-de-desafio', 'Tipo de desafio'],
-  ['tipos-de-missao', 'Tipo de missão'],
-  ['tipos-de-conteudo', 'Tipo de conteúdo educativo'],
-  ['progresso', 'Progresso geral'],
-].map(([path, titulo]) => ({
-  path: `/${path}`,
-  name: path,
-  component: EmBrevePlaceholder,
-  meta: { titulo },
-}))
 
 const router = createRouter({
   history: createWebHistory(),
@@ -50,7 +31,6 @@ const router = createRouter({
       meta: { requerLogin: true },
       children: [
         { path: 'painel', name: 'painel', component: InicioView },
-        ...emBreve,
       ],
     },
   ],

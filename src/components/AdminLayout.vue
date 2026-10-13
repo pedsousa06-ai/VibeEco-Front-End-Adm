@@ -1,5 +1,6 @@
 <script setup>
 import logo from '@/assets/vibeeco-logo.svg'
+import '@/assets/painel.css'
 import { House, Users, Target, Flag, BookOpen, Settings, Leaf, Search, Bell } from 'lucide-vue-next'
 
 const menu = [
