@@ -1,29 +1,32 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { estaLogado } from '@/services/auth'
+
+// Autenticação
 import PrimeiroLoginView from '@/views/PrimeiroLoginView.vue'
 import RedefinirSenhaView from '@/views/RedefinirSenhaView.vue'
 import LoginView from '@/views/LoginView.vue'
 import EsqueciSenhaView from '@/views/EsqueciSenhaView.vue'
 import VerificarCodigoView from '@/views/VerificarCodigoView.vue'
 import NovaSenhaView from '@/views/NovaSenhaView.vue'
+
+// Área interna
 import AdminLayout from '@/components/AdminLayout.vue'
+import GestaoTipos from '@/components/GestaoTipos.vue'
 import InicioView from '@/views/InicioView.vue'
 import MissoesView from '@/views/MissoesView.vue'
 import DesafiosView from '@/views/DesafiosView.vue'
 import ConteudosView from '@/views/ConteudosView.vue'
-import GestaoTipos from '@/components/GestaoTipos.vue'
 import UsuariosView from '@/views/UsuariosView.vue'
 import ProgressoView from '@/views/ProgressoView.vue'
 import ConfiguracoesView from '@/views/ConfiguracoesView.vue'
 
-// Deixe false enquanto não houver API, para poder navegar pelo painel.
-// Quando o login estiver pronto, mude para true e salve o token em
-// localStorage com a chave 'vibeeco_token' após autenticar.
-const PROTEGER_ROTAS = false
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/primeiro-login' },
+    // Quem já entrou vai direto ao painel; quem não entrou vai ao login
+    { path: '/', redirect: () => (estaLogado() ? '/painel' : '/login') },
+
+    // Autenticação (públicas)
     { path: '/primeiro-login', name: 'primeiro-login', component: PrimeiroLoginView },
     { path: '/redefinir-senha', name: 'redefinir-senha', component: RedefinirSenhaView },
     { path: '/login', name: 'login', component: LoginView },
@@ -31,7 +34,7 @@ const router = createRouter({
     { path: '/verificar-codigo', name: 'verificar-codigo', component: VerificarCodigoView },
     { path: '/nova-senha', name: 'nova-senha', component: NovaSenhaView },
 
-    // Área interna: todas as rotas compartilham o AdminLayout
+    // Área interna (exige login): todas as rotas compartilham o AdminLayout
     {
       path: '/',
       component: AdminLayout,
@@ -49,13 +52,21 @@ const router = createRouter({
         { path: 'configuracoes', name: 'configuracoes', component: ConfiguracoesView },
       ],
     },
+
+    // Endereço inexistente: volta para o início do fluxo
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
 router.beforeEach((to) => {
-  if (!PROTEGER_ROTAS) return true
-  const logado = !!localStorage.getItem('vibeeco_token')
-  if (to.meta.requerLogin && !logado) return { name: 'login' }
+  const logado = estaLogado()
+
+  // Área interna sem login: manda para o login e lembra para onde ia
+  if (to.meta.requerLogin && !logado) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  // Já logado não precisa ver o login de novo
+  if (to.name === 'login' && logado) return { name: 'painel' }
   return true
 })
 

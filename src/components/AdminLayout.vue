@@ -1,7 +1,15 @@
 <script setup>
 import logo from '@/assets/vibeeco-logo.svg'
 import '@/assets/painel.css'
-import { House, Users, Target, Flag, BookOpen, Settings, Leaf, Search, Bell } from 'lucide-vue-next'
+import { House, Users, Target, Flag, BookOpen, Settings, Leaf, Search, Bell, LogOut } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { sair } from '@/services/auth'
+
+const router = useRouter()
+function deslogar() {
+  sair()
+  router.push({ name: 'login' })
+}
 
 const menu = [
   { nome: 'Início', to: '/painel', icone: House, exato: true },
@@ -53,6 +61,10 @@ const menu = [
             <component :is="item.icone" :size="20" aria-hidden="true" />
             <span>{{ item.nome }}</span>
           </router-link>
+          <button type="button" class="menu-item sair" @click="deslogar">
+            <LogOut :size="20" aria-hidden="true" />
+            <span>Sair</span>
+          </button>
         </nav>
       </aside>
 
@@ -225,6 +237,13 @@ const menu = [
 .menu-item:focus-visible {
   outline: 2px solid #1fe05a;
   outline-offset: 2px;
+}
+.sair {
+  width: 100%;
+  margin-top: 16px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .menu-item.ativo {
   border-color: var(--verde-ativo);
