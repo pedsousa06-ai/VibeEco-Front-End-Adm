@@ -57,7 +57,7 @@ const menu = [
       </aside>
 
       <main class="conteudo">
-        <router-view />
+        <router-view :key="$route.path" />
       </main>
     </div>
 
