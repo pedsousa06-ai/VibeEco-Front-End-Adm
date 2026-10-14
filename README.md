@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # 🖥️ VibeEco-Front-End-Adm
 
 <p align="center">
