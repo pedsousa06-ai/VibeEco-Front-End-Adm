@@ -8,6 +8,7 @@ import NovaSenhaView from '@/views/NovaSenhaView.vue'
 import AdminLayout from '@/components/AdminLayout.vue'
 import InicioView from '@/views/InicioView.vue'
 import MissoesView from '@/views/MissoesView.vue'
+import ConteudosView from '@/views/ConteudosView.vue'
 
 // Deixe false enquanto não houver API, para poder navegar pelo painel.
 // Quando o login estiver pronto, mude para true e salve o token em
@@ -33,6 +34,7 @@ const router = createRouter({
       children: [
         { path: 'painel', name: 'painel', component: InicioView },
         { path: 'missoes', name: 'missoes', component: MissoesView },
+        { path: 'conteudos', name: 'conteudos', component: ConteudosView },
       ],
     },
   ],
