@@ -1,13 +1,16 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import logo from '@/assets/vibeeco-logo.svg'
+import { entrar as autenticar } from '@/services/auth'
 
 const router = useRouter()
+const route = useRoute()
 
 const login = ref('')
 const senha = ref('')
 const carregando = ref(false)
+const erro = ref('')
 
 function esqueciSenha() {
   router.push('/esqueci-senha')
@@ -16,10 +19,14 @@ function esqueciSenha() {
 async function entrar() {
   if (!login.value || !senha.value) return
   carregando.value = true
+  erro.value = ''
   try {
-    // TODO: chamar sua API de autenticação
-    // router.push('/painel')
-    console.log('login:', login.value)
+    // TODO: trocar por chamada à API em services/auth.js
+    await autenticar(login.value, senha.value)
+    // Volta para a tela que o usuário tentou abrir, ou vai ao painel
+    router.push(route.query.redirect || '/painel')
+  } catch (e) {
+    erro.value = e.message || 'Não foi possível entrar. Tente novamente.'
   } finally {
     carregando.value = false
   }
@@ -71,6 +78,8 @@ async function entrar() {
       <div class="esqueci-linha">
         <a href="#" class="esqueci" @click.prevent="esqueciSenha">Esqueci minha senha</a>
       </div>
+
+      <p v-if="erro" class="erro" role="alert">{{ erro }}</p>
 
       <button type="submit" :disabled="carregando">
         {{ carregando ? 'Entrando...' : 'Entrar' }}
@@ -209,6 +218,12 @@ async function entrar() {
   border-radius: 2px;
 }
 
+.erro {
+  margin: 12px 0 0 17px;
+  font-size: 14px;
+  color: #c62828;
+}
+
 button {
   display: block;
   width: calc(100% - 17px);
@@ -248,6 +263,7 @@ button:disabled {
   }
   .campo,
   .esqueci-linha,
+  .erro,
   button {
     margin-left: 0;
   }
