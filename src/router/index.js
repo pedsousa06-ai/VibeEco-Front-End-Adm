@@ -12,6 +12,7 @@ import DesafiosView from '@/views/DesafiosView.vue'
 import ConteudosView from '@/views/ConteudosView.vue'
 import GestaoTipos from '@/components/GestaoTipos.vue'
 import UsuariosView from '@/views/UsuariosView.vue'
+import ProgressoView from '@/views/ProgressoView.vue'
 
 // Deixe false enquanto não houver API, para poder navegar pelo painel.
 // Quando o login estiver pronto, mude para true e salve o token em
@@ -43,6 +44,7 @@ const router = createRouter({
         { path: 'tipos-de-missao', name: 'tipos-de-missao', component: GestaoTipos, props: { tipo: 'missao' } },
         { path: 'tipos-de-conteudo', name: 'tipos-de-conteudo', component: GestaoTipos, props: { tipo: 'conteudo' } },
         { path: 'usuarios', name: 'usuarios', component: UsuariosView },
+        { path: 'progresso', name: 'progresso', component: ProgressoView },
       ],
     },
   ],
