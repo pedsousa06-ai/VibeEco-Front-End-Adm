@@ -1,17 +1,22 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
-  Plus, Search, Pencil, Trash2, Timer, Zap, Coins, Target, Flag,
+  Plus, Search, Pencil, Trash2, Timer, Zap, Coins, Target, Flag, ListChecks,
   Recycle, Droplets, Bike, Apple,
 } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import ModalForm from '@/components/ModalForm.vue'
+import {
+  listarMissoes, criarMissao, atualizarMissao, excluirMissao,
+} from '@/services/missoes'
 
 const props = defineProps({
   tipo: { type: String, required: true }, // 'missao' | 'desafio'
 })
 
-// TODO: trocar os dados mockados por chamadas à API
+// Missões usam a API; desafios seguem mockados até existir o back-end deles
+const usaApi = props.tipo === 'missao'
+
 const CONFIG = {
   missao: {
     titulo: 'Missões',
@@ -27,12 +32,7 @@ const CONFIG = {
     recompensa: 'Recompensas',
     vazio: 'Nenhuma missão encontrada.',
     icone: Target,
-    dados: [
-      ['Descarte Consciente', 'Separe 3 tipos de resíduos e registre com foto.', 'Reciclagem', 'Fácil', 3, 150, 20, 45],
-      ['Semana sem Plástico', 'Evite plásticos descartáveis por 7 dias.', 'Reciclagem', 'Médio', 7, 250, 40, 20],
-      ['Luz Apagada', 'Desligue aparelhos que não estão em uso.', 'Energia', 'Fácil', 1, 50, 10, 80],
-      ['Banho de 5 minutos', 'Reduza o tempo de banho e registre a economia.', 'Água', 'Fácil', 3, 100, 15, 60],
-    ],
+    dados: [],
   },
   desafio: {
     titulo: 'Desafios',
@@ -67,12 +67,15 @@ const duracoes = [
   { valor: 15, nome: '15 dias' },
   { valor: 30, nome: '30 dias' },
 ]
+// Desafios (mock): XP e moedas num único select
 const recompensas = [
   { valor: '50-10', nome: '50 XP e 10 moedas' },
   { valor: '100-15', nome: '100 XP e 15 moedas' },
   { valor: '150-20', nome: '150 XP e 20 moedas' },
   { valor: '250-40', nome: '250 XP e 40 moedas' },
 ]
+// Missões: só as moedas são escolhidas; o XP é a soma das etapas
+const opcoesMoedas = [10, 15, 20, 40]
 const iconesCategoria = {
   Reciclagem: Recycle,
   Energia: Zap,
@@ -85,24 +88,60 @@ const classeDificuldade = { Fácil: 'tag--verde', Médio: 'tag--amarelo', Difíc
 const periodo = ref('30')
 const busca = ref('')
 const modalAberto = ref(false)
+const carregando = ref(false)
+const salvando = ref(false)
+const erro = ref('')
 const itens = ref(
   cfg.dados.map(([titulo, objetivo, categoria, dificuldade, duracao, xp, moedas, progresso], i) => ({
     id: i + 1, titulo, objetivo, categoria, dificuldade, duracao, xp, moedas, progresso, tipo: 'Individual',
   })),
 )
 
+async function carregar() {
+  if (!usaApi) return
+  carregando.value = true
+  erro.value = ''
+  try {
+    itens.value = await listarMissoes()
+  } catch (e) {
+    erro.value = e.message || 'Não foi possível carregar as missões.'
+  } finally {
+    carregando.value = false
+  }
+}
+onMounted(carregar)
+
 const filtrados = computed(() => {
   const termo = busca.value.trim().toLowerCase()
   return itens.value.filter((i) => i.titulo.toLowerCase().includes(termo))
 })
 
+const novaEtapa = () => ({ titulo: '', xp: 50 })
 const vazio = () => ({
-  id: null, titulo: '', objetivo: '', categoria: '', dificuldade: '', duracao: '', recompensa: '',
+  id: null, titulo: '', objetivo: '', dica: '', categoria: '', dificuldade: '', duracao: '',
+  recompensa: '', moedas: '', data_inicio: '', etapas: [novaEtapa()],
 })
 const form = reactive(vazio())
 
+// Se a missão tiver uma duração que não está na lista (ex.: 10 dias), ela continua aparecendo no select
+const opcoesDuracao = computed(() => {
+  const atual = Number(form.duracao)
+  if (!atual || duracoes.some((d) => d.valor === atual)) return duracoes
+  return [...duracoes, { valor: atual, nome: `${atual} dias` }].sort((a, b) => a.valor - b.valor)
+})
+
+const totalXp = computed(() => form.etapas.reduce((soma, e) => soma + (Number(e.xp) || 0), 0))
+
+function adicionarEtapa() {
+  if (form.etapas.length < 20) form.etapas.push(novaEtapa())
+}
+function removerEtapa(i) {
+  if (form.etapas.length > 1) form.etapas.splice(i, 1)
+}
+
 function abrirNovo() {
   Object.assign(form, vazio())
+  erro.value = ''
   modalAberto.value = true
 }
 function abrirEdicao(item) {
@@ -110,18 +149,58 @@ function abrirEdicao(item) {
     id: item.id,
     titulo: item.titulo,
     objetivo: item.objetivo,
+    dica: item.dica || '',
     categoria: item.categoria,
     dificuldade: item.dificuldade,
     duracao: item.duracao,
     recompensa: `${item.xp}-${item.moedas}`,
+    moedas: item.moedas,
+    data_inicio: item.data_inicio || '',
+    etapas: item.etapas?.length ? item.etapas.map((e) => ({ ...e })) : [novaEtapa()],
   })
+  erro.value = ''
   modalAberto.value = true
 }
 function mostrarTodos() {
   busca.value = ''
   modalAberto.value = false
 }
-function salvar() {
+
+async function salvar() {
+  if (usaApi) {
+    const etapasValidas = form.etapas.every((e) => e.titulo.trim() && Number(e.xp) > 0)
+    if (!etapasValidas) {
+      erro.value = 'Preencha o título e o XP (maior que 0) de todas as etapas.'
+      return
+    }
+
+    salvando.value = true
+    erro.value = ''
+    try {
+      const dados = {
+        titulo: form.titulo.trim(),
+        objetivo: form.objetivo.trim(),
+        dica: form.dica.trim(),
+        categoria: form.categoria,
+        dificuldade: form.dificuldade,
+        duracao: Number(form.duracao),
+        moedas: Number(form.moedas),
+        data_inicio: form.data_inicio,
+        etapas: form.etapas,
+      }
+      if (form.id) await atualizarMissao(form.id, dados)
+      else await criarMissao(dados)
+      await carregar()
+      modalAberto.value = false
+    } catch (e) {
+      erro.value = e.message || 'Não foi possível salvar a missão.'
+    } finally {
+      salvando.value = false
+    }
+    return
+  }
+
+  // desafios (mock)
   const [xp, moedas] = form.recompensa.split('-').map(Number)
   const dados = {
     titulo: form.titulo.trim(),
@@ -139,10 +218,22 @@ function salvar() {
   }
   modalAberto.value = false
 }
-function excluir(item) {
-  if (window.confirm(`Excluir "${item.titulo}"?`)) {
-    itens.value = itens.value.filter((i) => i.id !== item.id)
+
+async function excluir(item) {
+  if (!window.confirm(`Excluir "${item.titulo}"?`)) return
+  if (usaApi) {
+    try {
+      await excluirMissao(item.id)
+      await carregar()
+    } catch (e) {
+      erro.value =
+        e.status === 500
+          ? 'Não foi possível excluir. Se algum usuário já participa desta missão, ela não pode ser removida.'
+          : e.message || 'Não foi possível excluir a missão.'
+    }
+    return
   }
+  itens.value = itens.value.filter((i) => i.id !== item.id)
 }
 function exportar() {
   // TODO: exportar relatório do período selecionado
@@ -179,7 +270,9 @@ function exportar() {
       <input v-model="busca" type="search" placeholder="Buscar pelo Título" :aria-label="cfg.buscar" />
     </label>
 
-    <p v-if="!filtrados.length" class="pn-vazio">{{ cfg.vazio }}</p>
+    <p v-if="erro && !modalAberto" class="msg-erro" role="alert">{{ erro }}</p>
+    <p v-if="carregando" class="pn-vazio">Carregando...</p>
+    <p v-else-if="!filtrados.length" class="pn-vazio">{{ cfg.vazio }}</p>
 
     <div v-else class="lista">
       <article v-for="item in filtrados" :key="item.id" class="card">
@@ -188,21 +281,26 @@ function exportar() {
             <component :is="iconesCategoria[item.categoria] || cfg.icone" :size="14" aria-hidden="true" />
           </span>
           <div class="tags">
-            <span class="tag tag--azul">{{ item.tipo }}</span>
-            <span class="tag" :class="classeDificuldade[item.dificuldade]">{{ item.dificuldade }}</span>
+            <span v-if="item.categoria" class="tag tag--azul">{{ item.categoria }}</span>
+            <span v-else class="tag tag--azul">{{ item.tipo }}</span>
+            <span v-if="item.dificuldade" class="tag" :class="classeDificuldade[item.dificuldade]">{{ item.dificuldade }}</span>
           </div>
         </div>
 
         <h3>{{ item.titulo }}</h3>
-        <p class="objetivo">{{ item.objetivo }}</p>
+        <p v-if="item.objetivo" class="objetivo">{{ item.objetivo }}</p>
 
         <div class="meta">
           <div class="chips">
             <span class="chip"><Timer :size="12" aria-hidden="true" />{{ item.duracao }}d</span>
             <span class="chip chip--xp"><Zap :size="12" aria-hidden="true" />+{{ item.xp }}</span>
             <span class="chip chip--moeda"><Coins :size="12" aria-hidden="true" />{{ item.moedas }}</span>
+            <span v-if="usaApi" class="chip">
+              <ListChecks :size="12" aria-hidden="true" />{{ item.etapas.length }}
+              {{ item.etapas.length === 1 ? 'etapa' : 'etapas' }}
+            </span>
           </div>
-          <div class="progresso">
+          <div v-if="!usaApi" class="progresso">
             <div
               class="trilho"
               role="progressbar"
@@ -235,13 +333,18 @@ function exportar() {
       @cancelar="modalAberto = false"
       @salvar="salvar"
     >
+      <p v-if="erro" class="msg-erro" role="alert">{{ erro }}</p>
       <label class="pn-campo">
         <span>Título</span>
-        <input v-model="form.titulo" type="text" required :placeholder="cfg.placeholderTitulo" />
+        <input v-model="form.titulo" type="text" required maxlength="100" :placeholder="cfg.placeholderTitulo" />
       </label>
       <label class="pn-campo">
         <span>Objetivo</span>
         <input v-model="form.objetivo" type="text" required placeholder="Separe 3 tipos de resíduos..." />
+      </label>
+      <label v-if="usaApi" class="pn-campo">
+        <span>Dica da missão (opcional)</span>
+        <input v-model="form.dica" type="text" placeholder="Uma dica que aparece para o usuário" />
       </label>
       <div class="pn-grid-2">
         <label class="pn-campo">
@@ -262,10 +365,20 @@ function exportar() {
           <span>Duração</span>
           <select v-model="form.duracao" required>
             <option value="" disabled>Selecione...</option>
-            <option v-for="d in duracoes" :key="d.valor" :value="d.valor">{{ d.nome }}</option>
+            <option v-for="d in opcoesDuracao" :key="d.valor" :value="d.valor">{{ d.nome }}</option>
           </select>
         </label>
-        <label class="pn-campo">
+
+        <!-- Missões: só moedas (o XP vem das etapas) -->
+        <label v-if="usaApi" class="pn-campo">
+          <span>Moedas ao concluir</span>
+          <select v-model="form.moedas" required>
+            <option value="" disabled>Selecione...</option>
+            <option v-for="m in opcoesMoedas" :key="m" :value="m">{{ m }} moedas</option>
+          </select>
+        </label>
+        <!-- Desafios (mock): XP e moedas juntos -->
+        <label v-else class="pn-campo">
           <span>{{ cfg.recompensa }}</span>
           <select v-model="form.recompensa" required>
             <option value="" disabled>Selecione...</option>
@@ -273,11 +386,53 @@ function exportar() {
           </select>
         </label>
       </div>
+
+      <fieldset v-if="usaApi" class="etapas">
+        <legend>Etapas · {{ totalXp }} XP no total</legend>
+        <div v-for="(etapa, i) in form.etapas" :key="i" class="etapa-linha">
+          <input
+            v-model="etapa.titulo"
+            type="text"
+            required
+            maxlength="150"
+            :placeholder="`Etapa ${i + 1}`"
+            :aria-label="`Título da etapa ${i + 1}`"
+          />
+          <input
+            v-model.number="etapa.xp"
+            type="number"
+            required
+            min="1"
+            step="1"
+            :aria-label="`XP da etapa ${i + 1}`"
+          />
+          <button
+            type="button"
+            class="btn-remover"
+            :disabled="form.etapas.length === 1"
+            :aria-label="`Remover etapa ${i + 1}`"
+            @click="removerEtapa(i)"
+          >
+            <Trash2 :size="14" aria-hidden="true" />
+          </button>
+        </div>
+        <button type="button" class="btn-add-etapa" :disabled="form.etapas.length >= 20" @click="adicionarEtapa">
+          <Plus :size="14" aria-hidden="true" />Adicionar etapa
+        </button>
+      </fieldset>
     </ModalForm>
   </div>
 </template>
 
 <style scoped>
+.msg-erro {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fde8e8;
+  color: #c62828;
+  font-size: 13px;
+}
 .lista {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -356,6 +511,7 @@ h3 {
 }
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .chip {
@@ -433,5 +589,78 @@ h3 {
 .btn-excluir {
   background: #fde8e8;
   color: #c62828;
+}
+
+/* ---------- Etapas (dentro do modal) ---------- */
+.etapas {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 12px;
+  border: 1px solid #dfeae3;
+  border-radius: 10px;
+}
+.etapas legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #14301f;
+}
+.etapa-linha {
+  display: grid;
+  grid-template-columns: 1fr 90px 34px;
+  gap: 8px;
+  align-items: center;
+}
+.etapa-linha input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 1px solid #dfe5e1;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+}
+.etapa-linha input:focus-visible {
+  outline: 2px solid #2e7d32;
+  outline-offset: 1px;
+}
+.btn-remover,
+.btn-add-etapa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-remover {
+  width: 34px;
+  height: 36px;
+  background: #fde8e8;
+  color: #c62828;
+}
+.btn-add-etapa {
+  justify-self: start;
+  height: 32px;
+  padding: 0 12px;
+  background: #dff3e5;
+  color: #1b7a34;
+}
+.btn-remover:disabled,
+.btn-add-etapa:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-remover:focus-visible,
+.btn-add-etapa:focus-visible {
+  outline: 3px solid #1fe05a;
+  outline-offset: 2px;
 }
 </style>
