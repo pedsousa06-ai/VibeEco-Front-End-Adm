@@ -1,10 +1,11 @@
 // src/services/missoes.js
 // Comunicação do painel adm com a API de missões (back-end Node/Express).
 // Defina VITE_API_URL no .env do front, ex.: VITE_API_URL=http://localhost:8080/v1/vibeEco/administrador
-const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8080/v1/vibeEco/administrador').replace(/\/$/, '')
+// Helpers (BASE, requisitar, dia, diasEntre, somarDias, hojeLocal) são exportados para o services/desafios.js reutilizar.
+export const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8080/v1/vibeEco/administrador').replace(/\/$/, '')
 const URL_MISSAO = `${BASE}/missao`
 
-async function requisitar(url, opcoes = {}) {
+export async function requisitar(url, opcoes = {}) {
   let resp
   try {
     resp = await fetch(url, {
@@ -37,9 +38,9 @@ async function requisitar(url, opcoes = {}) {
 export const ID_DIFICULDADE = { Fácil: 1, Médio: 2, Difícil: 3 }
 export const ID_CATEGORIA = { Reciclagem: 1, Energia: 2, Água: 3, Mobilidade: 4, Alimentação: 5 }
 
-const dia = (v) => String(v).slice(0, 10) // 'YYYY-MM-DD'
+export const dia = (v) => String(v).slice(0, 10) // 'YYYY-MM-DD'
 
-function diasEntre(inicio, termino) {
+export function diasEntre(inicio, termino) {
   const ms = new Date(dia(termino) + 'T00:00:00') - new Date(dia(inicio) + 'T00:00:00')
   return Math.max(1, Math.round(ms / 86400000))
 }
@@ -51,7 +52,7 @@ export function somarDias(data, dias) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-function hojeLocal() {
+export function hojeLocal() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
