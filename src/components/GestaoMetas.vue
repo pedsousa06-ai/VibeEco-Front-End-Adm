@@ -6,16 +6,18 @@ import {
 } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import ModalForm from '@/components/ModalForm.vue'
-import {
-  listarMissoes, criarMissao, atualizarMissao, excluirMissao,
-} from '@/services/missoes'
+import { listarMissoes, criarMissao, atualizarMissao, excluirMissao } from '@/services/missoes'
+import { listarDesafios, criarDesafio, atualizarDesafio, excluirDesafio } from '@/services/desafios'
 
 const props = defineProps({
   tipo: { type: String, required: true }, // 'missao' | 'desafio'
 })
 
-// Missões usam a API; desafios seguem mockados até existir o back-end deles
-const usaApi = props.tipo === 'missao'
+// Missões e desafios usam a API; a única diferença é qual service é chamado
+const ehMissao = props.tipo === 'missao'
+const api = ehMissao
+  ? { listar: listarMissoes, criar: criarMissao, atualizar: atualizarMissao, excluir: excluirMissao }
+  : { listar: listarDesafios, criar: criarDesafio, atualizar: atualizarDesafio, excluir: excluirDesafio }
 
 const CONFIG = {
   missao: {
@@ -29,10 +31,9 @@ const CONFIG = {
     editar: 'Editar Missão',
     descNovo: 'Preencha os dados abaixo para cadastrar uma nova missão.',
     placeholderTitulo: 'Título da Missão',
-    recompensa: 'Recompensas',
+    moedas: 'Moedas ao concluir',
     vazio: 'Nenhuma missão encontrada.',
     icone: Target,
-    dados: [],
   },
   desafio: {
     titulo: 'Desafios',
@@ -45,15 +46,9 @@ const CONFIG = {
     editar: 'Editar Desafio',
     descNovo: 'Preencha os dados abaixo para cadastrar um novo desafio.',
     placeholderTitulo: 'Título do Desafio',
-    recompensa: 'Recompensa',
+    moedas: 'Super Coins ao concluir',
     vazio: 'Nenhum desafio encontrado.',
     icone: Flag,
-    dados: [
-      ['Descarte Consciente', 'Separe 3 tipos de resíduos e registre com foto.', 'Reciclagem', 'Fácil', 3, 150, 20, 45],
-      ['Mês da Bicicleta', 'Troque o carro por bicicleta em 10 trajetos.', 'Mobilidade', 'Difícil', 30, 250, 40, 15],
-      ['Prato Sustentável', 'Monte 5 refeições sem desperdício de comida.', 'Alimentação', 'Médio', 7, 100, 15, 55],
-      ['Desafio da Água', 'Economize água em casa durante 15 dias.', 'Água', 'Médio', 15, 150, 20, 30],
-    ],
   },
 }
 const cfg = CONFIG[props.tipo]
@@ -67,15 +62,8 @@ const duracoes = [
   { valor: 15, nome: '15 dias' },
   { valor: 30, nome: '30 dias' },
 ]
-// Desafios (mock): XP e moedas num único select
-const recompensas = [
-  { valor: '50-10', nome: '50 XP e 10 moedas' },
-  { valor: '100-15', nome: '100 XP e 15 moedas' },
-  { valor: '150-20', nome: '150 XP e 20 moedas' },
-  { valor: '250-40', nome: '250 XP e 40 moedas' },
-]
-// Missões: só as moedas são escolhidas; o XP é a soma das etapas
-const opcoesMoedas = [10, 15, 20, 40]
+// Missões e desafios: só as moedas são escolhidas; na missão o XP é a soma das etapas
+const opcoesMoedasBase = [10, 15, 20, 40]
 const iconesCategoria = {
   Reciclagem: Recycle,
   Energia: Zap,
@@ -91,20 +79,15 @@ const modalAberto = ref(false)
 const carregando = ref(false)
 const salvando = ref(false)
 const erro = ref('')
-const itens = ref(
-  cfg.dados.map(([titulo, objetivo, categoria, dificuldade, duracao, xp, moedas, progresso], i) => ({
-    id: i + 1, titulo, objetivo, categoria, dificuldade, duracao, xp, moedas, progresso, tipo: 'Individual',
-  })),
-)
+const itens = ref([])
 
 async function carregar() {
-  if (!usaApi) return
   carregando.value = true
   erro.value = ''
   try {
-    itens.value = await listarMissoes()
+    itens.value = await api.listar()
   } catch (e) {
-    erro.value = e.message || 'Não foi possível carregar as missões.'
+    erro.value = e.message || `Não foi possível carregar ${ehMissao ? 'as missões' : 'os desafios'}.`
   } finally {
     carregando.value = false
   }
@@ -119,15 +102,20 @@ const filtrados = computed(() => {
 const novaEtapa = () => ({ titulo: '', xp: 50 })
 const vazio = () => ({
   id: null, titulo: '', objetivo: '', dica: '', categoria: '', dificuldade: '', duracao: '',
-  recompensa: '', moedas: '', data_inicio: '', etapas: [novaEtapa()],
+  moedas: '', data_inicio: '', etapas: [novaEtapa()],
 })
 const form = reactive(vazio())
 
-// Se a missão tiver uma duração que não está na lista (ex.: 10 dias), ela continua aparecendo no select
+// Se o item tiver um valor que não está na lista (ex.: 10 dias, 25 moedas), ele continua aparecendo no select
 const opcoesDuracao = computed(() => {
   const atual = Number(form.duracao)
   if (!atual || duracoes.some((d) => d.valor === atual)) return duracoes
   return [...duracoes, { valor: atual, nome: `${atual} dias` }].sort((a, b) => a.valor - b.valor)
+})
+const opcoesMoedas = computed(() => {
+  const atual = Number(form.moedas)
+  if (!atual || opcoesMoedasBase.includes(atual)) return opcoesMoedasBase
+  return [...opcoesMoedasBase, atual].sort((a, b) => a - b)
 })
 
 const totalXp = computed(() => form.etapas.reduce((soma, e) => soma + (Number(e.xp) || 0), 0))
@@ -153,7 +141,6 @@ function abrirEdicao(item) {
     categoria: item.categoria,
     dificuldade: item.dificuldade,
     duracao: item.duracao,
-    recompensa: `${item.xp}-${item.moedas}`,
     moedas: item.moedas,
     data_inicio: item.data_inicio || '',
     etapas: item.etapas?.length ? item.etapas.map((e) => ({ ...e })) : [novaEtapa()],
@@ -167,73 +154,54 @@ function mostrarTodos() {
 }
 
 async function salvar() {
-  if (usaApi) {
+  if (ehMissao) {
     const etapasValidas = form.etapas.every((e) => e.titulo.trim() && Number(e.xp) > 0)
     if (!etapasValidas) {
       erro.value = 'Preencha o título e o XP (maior que 0) de todas as etapas.'
       return
     }
+  }
 
-    salvando.value = true
-    erro.value = ''
-    try {
-      const dados = {
-        titulo: form.titulo.trim(),
-        objetivo: form.objetivo.trim(),
-        dica: form.dica.trim(),
-        categoria: form.categoria,
-        dificuldade: form.dificuldade,
-        duracao: Number(form.duracao),
-        moedas: Number(form.moedas),
-        data_inicio: form.data_inicio,
-        etapas: form.etapas,
-      }
-      if (form.id) await atualizarMissao(form.id, dados)
-      else await criarMissao(dados)
-      await carregar()
-      modalAberto.value = false
-    } catch (e) {
-      erro.value = e.message || 'Não foi possível salvar a missão.'
-    } finally {
-      salvando.value = false
+  salvando.value = true
+  erro.value = ''
+  try {
+    const dados = {
+      titulo: form.titulo.trim(),
+      objetivo: form.objetivo.trim(),
+      categoria: form.categoria,
+      dificuldade: form.dificuldade,
+      duracao: Number(form.duracao),
+      moedas: Number(form.moedas),
+      data_inicio: form.data_inicio,
     }
-    return
+    if (ehMissao) {
+      dados.dica = form.dica.trim()
+      dados.etapas = form.etapas
+    }
+    if (form.id) await api.atualizar(form.id, dados)
+    else await api.criar(dados)
+    await carregar()
+    modalAberto.value = false
+  } catch (e) {
+    erro.value = e.message || `Não foi possível salvar ${ehMissao ? 'a missão' : 'o desafio'}.`
+  } finally {
+    salvando.value = false
   }
-
-  // desafios (mock)
-  const [xp, moedas] = form.recompensa.split('-').map(Number)
-  const dados = {
-    titulo: form.titulo.trim(),
-    objetivo: form.objetivo.trim(),
-    categoria: form.categoria,
-    dificuldade: form.dificuldade,
-    duracao: Number(form.duracao),
-    xp,
-    moedas,
-  }
-  if (form.id) {
-    Object.assign(itens.value.find((i) => i.id === form.id), dados)
-  } else {
-    itens.value.unshift({ id: Date.now(), tipo: 'Individual', progresso: 0, ...dados })
-  }
-  modalAberto.value = false
 }
 
 async function excluir(item) {
   if (!window.confirm(`Excluir "${item.titulo}"?`)) return
-  if (usaApi) {
-    try {
-      await excluirMissao(item.id)
-      await carregar()
-    } catch (e) {
-      erro.value =
-        e.status === 500
+  try {
+    await api.excluir(item.id)
+    await carregar()
+  } catch (e) {
+    erro.value =
+      e.status === 500
+        ? ehMissao
           ? 'Não foi possível excluir. Se algum usuário já participa desta missão, ela não pode ser removida.'
-          : e.message || 'Não foi possível excluir a missão.'
-    }
-    return
+          : 'Não foi possível excluir. Se algum usuário já participa deste desafio, ele não pode ser removido.'
+        : e.message || 'Não foi possível excluir.'
   }
-  itens.value = itens.value.filter((i) => i.id !== item.id)
 }
 function exportar() {
   // TODO: exportar relatório do período selecionado
@@ -293,25 +261,12 @@ function exportar() {
         <div class="meta">
           <div class="chips">
             <span class="chip"><Timer :size="12" aria-hidden="true" />{{ item.duracao }}d</span>
-            <span class="chip chip--xp"><Zap :size="12" aria-hidden="true" />+{{ item.xp }}</span>
+            <span v-if="ehMissao" class="chip chip--xp"><Zap :size="12" aria-hidden="true" />+{{ item.xp }}</span>
             <span class="chip chip--moeda"><Coins :size="12" aria-hidden="true" />{{ item.moedas }}</span>
-            <span v-if="usaApi" class="chip">
+            <span v-if="ehMissao" class="chip">
               <ListChecks :size="12" aria-hidden="true" />{{ item.etapas.length }}
               {{ item.etapas.length === 1 ? 'etapa' : 'etapas' }}
             </span>
-          </div>
-          <div v-if="!usaApi" class="progresso">
-            <div
-              class="trilho"
-              role="progressbar"
-              aria-label="Progresso"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-valuenow="item.progresso"
-            >
-              <div class="preenchimento" :style="{ width: item.progresso + '%' }"></div>
-            </div>
-            <span>{{ item.progresso }}%</span>
           </div>
         </div>
 
@@ -342,7 +297,7 @@ function exportar() {
         <span>Objetivo</span>
         <input v-model="form.objetivo" type="text" required placeholder="Separe 3 tipos de resíduos..." />
       </label>
-      <label v-if="usaApi" class="pn-campo">
+      <label v-if="ehMissao" class="pn-campo">
         <span>Dica da missão (opcional)</span>
         <input v-model="form.dica" type="text" placeholder="Uma dica que aparece para o usuário" />
       </label>
@@ -369,25 +324,23 @@ function exportar() {
           </select>
         </label>
 
-        <!-- Missões: só moedas (o XP vem das etapas) -->
-        <label v-if="usaApi" class="pn-campo">
-          <span>Moedas ao concluir</span>
+        <!-- Missões e desafios: só moedas (na missão o XP vem das etapas) -->
+        <label class="pn-campo">
+          <span>{{ cfg.moedas }}</span>
           <select v-model="form.moedas" required>
             <option value="" disabled>Selecione...</option>
             <option v-for="m in opcoesMoedas" :key="m" :value="m">{{ m }} moedas</option>
           </select>
         </label>
-        <!-- Desafios (mock): XP e moedas juntos -->
-        <label v-else class="pn-campo">
-          <span>{{ cfg.recompensa }}</span>
-          <select v-model="form.recompensa" required>
-            <option value="" disabled>Selecione...</option>
-            <option v-for="r in recompensas" :key="r.valor" :value="r.valor">{{ r.nome }}</option>
-          </select>
+
+        <!-- Desafios: data de início (vazia = hoje); o término é início + duração -->
+        <label v-if="!ehMissao" class="pn-campo">
+          <span>Data de início (opcional)</span>
+          <input v-model="form.data_inicio" type="date" />
         </label>
       </div>
 
-      <fieldset v-if="usaApi" class="etapas">
+      <fieldset v-if="ehMissao" class="etapas">
         <legend>Etapas · {{ totalXp }} XP no total</legend>
         <div v-for="(etapa, i) in form.etapas" :key="i" class="etapa-linha">
           <input
@@ -533,26 +486,6 @@ h3 {
 }
 .chip--moeda {
   color: #a8650a;
-}
-.progresso {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #1b7a34;
-}
-.trilho {
-  width: 82px;
-  height: 7px;
-  border-radius: 99px;
-  background: #e1e8e3;
-  overflow: hidden;
-}
-.preenchimento {
-  height: 100%;
-  border-radius: 99px;
-  background: #2e7d32;
 }
 
 .card-acoes {
