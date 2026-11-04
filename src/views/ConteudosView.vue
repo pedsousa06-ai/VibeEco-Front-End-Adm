@@ -1,19 +1,22 @@
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
-  Plus, Search, Pencil, Trash2, BookOpen, Check, Clock, Star,
+  Plus, Search, Pencil, Trash2, BookOpen, Check, Clock,
   ImagePlus, Upload, Paperclip, FileText, X,
 } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import ModalForm from '@/components/ModalForm.vue'
+import {
+  listarConteudos, criarConteudo, atualizarConteudo, excluirConteudo, trocarCapaConteudo,
+} from '@/services/conteudos'
 
-// TODO: trocar os dados mockados por chamadas à API.
-// Os arquivos escolhidos ficam só em memória (objectURL). Cada item guarda também o
-// objeto File original em "arquivo", pronto para enviar com FormData quando houver API.
+// Os dados vêm da API. Os arquivos escolhidos ficam em memória (objectURL) só para a prévia
+// e seguem para a API com FormData ao salvar (cada item novo guarda o File original em "arquivo").
+// Imagem/anexo que já está salvo não tem "arquivo": a "url" dele é a do Azure.
 const categorias = ['Reciclagem', 'Energia', 'Água', 'Mobilidade', 'Alimentação']
 const duracoes = [3, 5, 8, 10, 15]
 
-// Regras de upload
+// Regras de upload (o back-end valida as mesmas)
 const IMAGEM_TIPOS = ['image/png', 'image/jpeg', 'image/webp']
 const IMAGEM_MAX = 5 * 1024 * 1024
 const ANEXO_EXTENSOES = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.zip']
@@ -23,12 +26,27 @@ const ANEXOS_LIMITE = 5
 const periodo = ref('30')
 const busca = ref('')
 const modalAberto = ref(false)
-const itens = ref([
-  { id: 1, titulo: 'Guia de Reciclagem Doméstica', descricao: 'Guia prático de reciclagem.', categoria: 'Reciclagem', duracao: 8, xp: 50, imagem: null, anexos: [], revisado: true },
-  { id: 2, titulo: 'Como Economizar Energia', descricao: 'Hábitos simples para reduzir o consumo.', categoria: 'Energia', duracao: 5, xp: 50, imagem: null, anexos: [], revisado: true },
-  { id: 3, titulo: 'Uso Consciente da Água', descricao: 'Dicas para evitar o desperdício em casa.', categoria: 'Água', duracao: 10, xp: 50, imagem: null, anexos: [], revisado: false },
-  { id: 4, titulo: 'Mobilidade Sustentável', descricao: 'Alternativas ao carro no dia a dia.', categoria: 'Mobilidade', duracao: 8, xp: 50, imagem: null, anexos: [], revisado: false },
-])
+const carregando = ref(false)
+const salvando = ref(false)
+const erroPagina = ref('')
+const itens = ref([])
+
+// "Revisado" ainda não existe no banco: lembra só enquanto a página está aberta
+const revisados = new Set()
+
+async function carregar() {
+  carregando.value = true
+  erroPagina.value = ''
+  try {
+    const lista = await listarConteudos()
+    itens.value = lista.map((item) => ({ ...item, revisado: revisados.has(item.id) }))
+  } catch (e) {
+    erroPagina.value = e.message || 'Não foi possível carregar os conteúdos.'
+  } finally {
+    carregando.value = false
+  }
+}
+onMounted(carregar)
 
 const filtrados = computed(() => {
   const termo = busca.value.trim().toLowerCase()
@@ -41,7 +59,14 @@ const erro = ref('')
 const erroUpload = ref('')
 const arrastando = ref('')
 
-// URLs criadas durante a edição atual (precisam ser liberadas se o usuário cancelar)
+// Se o conteúdo tiver uma duração que não está na lista, ela continua aparecendo no select
+const opcoesDuracao = computed(() => {
+  const atual = Number(form.duracao)
+  if (!atual || duracoes.includes(atual)) return duracoes
+  return [...duracoes, atual].sort((a, b) => a - b)
+})
+
+// URLs de prévia criadas durante a edição atual (precisam ser liberadas ao salvar ou cancelar)
 const urlsNovas = new Set()
 
 function criarUrl(arquivo) {
@@ -54,8 +79,9 @@ function liberarUrl(url) {
   URL.revokeObjectURL(url)
   urlsNovas.delete(url)
 }
-function urlsDoItem(item) {
-  return [item?.imagem?.url, ...(item?.anexos ?? []).map((a) => a.url)].filter(Boolean)
+function liberarTodasAsUrls() {
+  urlsNovas.forEach((url) => URL.revokeObjectURL(url))
+  urlsNovas.clear()
 }
 function formatarTamanho(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
@@ -156,44 +182,50 @@ function abrirEdicao(item) {
   modalAberto.value = true
 }
 function fechar() {
-  // Cancelou: libera o que foi escolhido nesta edição e não foi salvo
-  urlsNovas.forEach((url) => URL.revokeObjectURL(url))
-  urlsNovas.clear()
+  // Cancelou: libera as prévias escolhidas nesta edição e não salvas
+  liberarTodasAsUrls()
   modalAberto.value = false
 }
 function mostrarTodos() {
   busca.value = ''
   if (modalAberto.value) fechar()
 }
-function salvar() {
-  const antigo = form.id ? itens.value.find((i) => i.id === form.id) : null
-
-  // Libera as URLs do item antigo que foram removidas ou trocadas
-  const mantidas = new Set([form.imagem?.url, ...form.anexos.map((a) => a.url)])
-  urlsDoItem(antigo).forEach((url) => {
-    if (!mantidas.has(url)) URL.revokeObjectURL(url)
-  })
-  urlsNovas.clear() // o que sobrou agora pertence ao item salvo
-
-  const dados = {
-    titulo: form.titulo.trim(),
-    descricao: form.descricao.trim(),
-    categoria: form.categoria,
-    duracao: Number(form.duracao),
-    imagem: form.imagem ? { ...form.imagem } : null,
-    anexos: form.anexos.map((a) => ({ ...a })),
+async function salvar() {
+  if (salvando.value) return
+  salvando.value = true
+  erro.value = ''
+  try {
+    const dados = {
+      titulo: form.titulo.trim(),
+      descricao: form.descricao.trim(),
+      categoria: form.categoria,
+      duracao: Number(form.duracao),
+      imagem: form.imagem,
+      anexos: form.anexos,
+    }
+    if (form.id) await atualizarConteudo(form.id, dados)
+    else await criarConteudo(dados)
+    liberarTodasAsUrls() // as prévias não são mais necessárias: a lista passa a usar as URLs do Azure
+    modalAberto.value = false
+    await carregar()
+  } catch (e) {
+    erro.value = e.message || 'Não foi possível salvar o conteúdo.'
+  } finally {
+    salvando.value = false
   }
-  if (antigo) {
-    Object.assign(antigo, dados)
-  } else {
-    itens.value.unshift({ id: Date.now(), xp: 50, revisado: false, ...dados })
-  }
-  modalAberto.value = false
 }
-function excluir(item) {
-  if (window.confirm(`Excluir "${item.titulo}"?`)) {
-    urlsDoItem(item).forEach((url) => URL.revokeObjectURL(url))
-    itens.value = itens.value.filter((i) => i.id !== item.id)
+async function excluir(item) {
+  if (!window.confirm(`Excluir "${item.titulo}"?`)) return
+  avisar('')
+  try {
+    await excluirConteudo(item.id)
+    await carregar()
+  } catch (e) {
+    avisar(
+      e.status === 500
+        ? 'Não foi possível excluir. Se algum usuário já acessou este conteúdo, ele não pode ser removido.'
+        : e.message || 'Não foi possível excluir o conteúdo.',
+    )
   }
 }
 const avisoPagina = ref('')
@@ -204,19 +236,24 @@ function avisar(mensagem) {
   if (mensagem) timerAviso = setTimeout(() => (avisoPagina.value = ''), 6000)
 }
 // Troca a capa direto pelo card, sem abrir o modal
-function aoTrocarCapa(item, e) {
+async function aoTrocarCapa(item, e) {
   const arquivo = e.target.files?.[0]
   e.target.value = ''
   if (!arquivo) return
   if (!IMAGEM_TIPOS.includes(arquivo.type)) return avisar('A imagem precisa ser PNG, JPG ou WebP.')
   if (arquivo.size > IMAGEM_MAX) return avisar('A imagem deve ter no máximo 5 MB.')
-  if (item.imagem?.url) URL.revokeObjectURL(item.imagem.url)
-  item.imagem = { url: URL.createObjectURL(arquivo), nome: arquivo.name, tamanho: arquivo.size, arquivo }
   avisar('')
+  try {
+    await trocarCapaConteudo(item, arquivo)
+    await carregar()
+  } catch (err) {
+    avisar(err.message || 'Não foi possível trocar a capa.')
+  }
 }
 function revisar(item) {
-  // TODO: abrir a tela de revisão do conteúdo. Por enquanto só marca como revisado.
+  // TODO: abrir a tela de revisão do conteúdo. Por enquanto só marca como revisado (não é salvo no banco).
   item.revisado = true
+  revisados.add(item.id)
 }
 function exportar() {
   // TODO: exportar relatório do período selecionado
@@ -224,8 +261,8 @@ function exportar() {
 }
 
 onBeforeUnmount(() => {
-  itens.value.forEach((item) => urlsDoItem(item).forEach((url) => URL.revokeObjectURL(url)))
-  urlsNovas.forEach((url) => URL.revokeObjectURL(url))
+  liberarTodasAsUrls()
+  clearTimeout(timerAviso)
 })
 </script>
 
@@ -263,14 +300,21 @@ onBeforeUnmount(() => {
       <input v-model="busca" type="search" placeholder="Buscar pelo Título" aria-label="Buscar Conteúdo" />
     </label>
 
+    <p v-if="erroPagina" class="aviso" role="alert">{{ erroPagina }}</p>
     <p v-if="avisoPagina" class="aviso" role="alert">{{ avisoPagina }}</p>
 
-    <p v-if="!filtrados.length" class="pn-vazio">Nenhum conteúdo encontrado.</p>
+    <p v-if="carregando" class="pn-vazio">Carregando...</p>
+    <p v-else-if="!filtrados.length" class="pn-vazio">Nenhum conteúdo encontrado.</p>
 
     <div v-else class="lista">
       <article v-for="item in filtrados" :key="item.id" class="card">
         <div class="capa">
-          <img v-if="item.imagem" :src="item.imagem.url" :alt="`Capa de ${item.titulo}`" />
+          <img
+            v-if="item.imagem && !item.capaFalhou"
+            :src="item.imagem.url"
+            :alt="`Capa de ${item.titulo}`"
+            @error="item.capaFalhou = true"
+          />
           <BookOpen v-else :size="48" class="capa-icone" aria-hidden="true" />
           <label class="capa-trocar">
             <ImagePlus :size="16" aria-hidden="true" />
@@ -285,8 +329,7 @@ onBeforeUnmount(() => {
 
         <div class="corpo">
           <div class="linha">
-            <span class="tag">{{ item.categoria }}</span>
-            <span class="xp"><Star :size="14" aria-hidden="true" />{{ item.xp }} XP</span>
+            <span class="tag">{{ item.categoria || 'Sem categoria' }}</span>
           </div>
 
           <h3>{{ item.titulo }}</h3>
@@ -320,7 +363,7 @@ onBeforeUnmount(() => {
     >
       <label class="pn-campo">
         <span>Título</span>
-        <input v-model="form.titulo" type="text" required placeholder="Título do Conteúdo" />
+        <input v-model="form.titulo" type="text" required maxlength="100" placeholder="Título do Conteúdo" />
       </label>
       <label class="pn-campo">
         <span>Descrição</span>
@@ -338,7 +381,7 @@ onBeforeUnmount(() => {
           <span>Duração</span>
           <select v-model="form.duracao" required>
             <option value="" disabled>Selecione...</option>
-            <option v-for="d in duracoes" :key="d" :value="d">{{ d }} min de leitura</option>
+            <option v-for="d in opcoesDuracao" :key="d" :value="d">{{ d }} min de leitura</option>
           </select>
         </label>
       </div>
@@ -352,7 +395,7 @@ onBeforeUnmount(() => {
             <img :src="form.imagem.url" alt="Prévia da imagem de capa" />
             <div class="previa-info">
               <strong>{{ form.imagem.nome }}</strong>
-              <small>{{ formatarTamanho(form.imagem.tamanho) }}</small>
+              <small v-if="form.imagem.tamanho">{{ formatarTamanho(form.imagem.tamanho) }}</small>
             </div>
             <div class="previa-acoes">
               <label class="btn-mini">
@@ -412,7 +455,7 @@ onBeforeUnmount(() => {
             <li v-for="a in form.anexos" :key="a.id">
               <FileText :size="18" aria-hidden="true" />
               <a :href="a.url" target="_blank" rel="noopener" :title="a.nome">{{ a.nome }}</a>
-              <small>{{ formatarTamanho(a.tamanho) }}</small>
+              <small v-if="a.tamanho">{{ formatarTamanho(a.tamanho) }}</small>
               <button type="button" class="remover" :aria-label="`Remover ${a.nome}`" @click="removerAnexo(a)">
                 <X :size="16" aria-hidden="true" />
               </button>
@@ -519,16 +562,6 @@ onBeforeUnmount(() => {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-}
-.xp {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: #4b6254;
-}
-.xp svg {
-  color: #f2a01e;
 }
 h3 {
   margin: 14px 0 6px;
