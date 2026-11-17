@@ -1,17 +1,33 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import AuthLayout from '@/components/AuthLayout.vue'
+import { redefinirSenhaComCodigo, obterEmailRecuperacao, obterCodigoRecuperacao } from '@/services/auth'
 
 const router = useRouter()
+const route = useRoute()
 
 const novaSenha = ref('')
 const confirmarSenha = ref('')
 const erro = ref('')
+const sucesso = ref('')
 const carregando = ref(false)
+
+const email = ref('')
+const codigo = ref('')
+
+onMounted(() => {
+  email.value = route.query.email || obterEmailRecuperacao()
+  codigo.value = route.query.codigo || obterCodigoRecuperacao()
+
+  if (!email.value || !codigo.value) {
+    router.push('/esqueci-senha')
+  }
+})
 
 async function salvar() {
   erro.value = ''
+  sucesso.value = ''
 
   if (novaSenha.value.length < 8) {
     erro.value = 'A senha precisa ter pelo menos 8 caracteres.'
@@ -24,8 +40,13 @@ async function salvar() {
 
   carregando.value = true
   try {
-    // TODO: chamar a API para salvar a nova senha
-    router.push('/login')
+    await redefinirSenhaComCodigo(email.value, codigo.value, novaSenha.value)
+    sucesso.value = 'Senha alterada com sucesso! Redirecionando para o login...'
+    setTimeout(() => {
+      router.push('/login')
+    }, 1500)
+  } catch (e) {
+    erro.value = e.message || 'Não foi possível alterar a senha. Tente novamente.'
   } finally {
     carregando.value = false
   }
@@ -71,6 +92,7 @@ async function salvar() {
       </label>
 
       <p v-if="erro" class="auth-erro" role="alert">{{ erro }}</p>
+      <p v-if="sucesso" class="auth-info" role="status" style="color: #278343; font-weight: 500; text-align: center; margin-top: 15px;">{{ sucesso }}</p>
 
       <button class="auth-botao botao" type="submit" :disabled="carregando">
         {{ carregando ? 'Salvando...' : 'Salvar' }}

@@ -1,9 +1,11 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import AuthLayout from '@/components/AuthLayout.vue'
+import { validarCodigo, solicitarRecuperacao, obterEmailRecuperacao } from '@/services/auth'
 
 const router = useRouter()
+const route = useRoute()
 
 const TAMANHO = 6
 const digitos = ref(Array(TAMANHO).fill(''))
@@ -11,6 +13,15 @@ const caixas = []
 const erro = ref('')
 const info = ref('')
 const carregando = ref(false)
+
+const email = ref('')
+
+onMounted(() => {
+  email.value = route.query.email || obterEmailRecuperacao()
+  if (!email.value) {
+    router.push('/esqueci-senha')
+  }
+})
 
 function aoDigitar(i, evento) {
   const valor = evento.target.value.replace(/\D/g, '').slice(-1)
@@ -48,17 +59,24 @@ async function verificar() {
 
   carregando.value = true
   try {
-    // TODO: chamar a API para validar o código
-    router.push('/nova-senha')
+    await validarCodigo(email.value, codigo)
+    router.push({ path: '/nova-senha', query: { email: email.value, codigo } })
+  } catch (e) {
+    erro.value = e.message || 'Código de verificação incorreto ou expirado.'
   } finally {
     carregando.value = false
   }
 }
 
-function reenviar() {
+async function reenviar() {
   erro.value = ''
-  // TODO: chamar a API para reenviar o código
-  info.value = 'Enviamos um novo código para o seu e-mail.'
+  info.value = ''
+  try {
+    await solicitarRecuperacao(email.value)
+    info.value = 'Enviamos um novo código para o seu e-mail.'
+  } catch (e) {
+    erro.value = e.message || 'Não foi possível reenviar o código.'
+  }
 }
 </script>
 

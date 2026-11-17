@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AuthLayout from '@/components/AuthLayout.vue'
+import { solicitarRecuperacao } from '@/services/auth'
 
 const router = useRouter()
 
@@ -19,8 +20,10 @@ async function enviar() {
 
   carregando.value = true
   try {
-    // TODO: chamar a API que envia o código para o e-mail informado
-    router.push('/verificar-codigo')
+    await solicitarRecuperacao(email.value)
+    router.push({ path: '/verificar-codigo', query: { email: email.value.trim() } })
+  } catch (e) {
+    erro.value = e.message || 'Não foi possível solicitar o código de recuperação.'
   } finally {
     carregando.value = false
   }

@@ -7,10 +7,26 @@ const URL_MISSAO = `${BASE}/missao`
 
 export async function requisitar(url, opcoes = {}) {
   let resp
+  const token = localStorage.getItem('vibeeco_token')
+  const headers = {}
+
+  if (!(opcoes.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  if (token) {
+    headers['x-access-token'] = token
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  if (opcoes.headers) {
+    Object.assign(headers, opcoes.headers)
+  }
+
   try {
     resp = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
       ...opcoes,
+      headers,
     })
   } catch {
     // fetch só lança erro quando nem chegou ao servidor (API desligada, URL errada, CORS)
@@ -26,6 +42,10 @@ export async function requisitar(url, opcoes = {}) {
     // resposta sem corpo
   }
   if (!resp.ok) {
+    if (resp.status === 401 && token) {
+      localStorage.removeItem('vibeeco_token')
+      localStorage.removeItem('vibeeco_user')
+    }
     const campo = corpo?.field ? ` ${corpo.field}` : ''
     const erro = new Error((corpo?.message || 'Erro ao comunicar com o servidor.') + campo)
     erro.status = resp.status

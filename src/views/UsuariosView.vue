@@ -1,23 +1,38 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Plus, Search, Pencil, Users, UserCheck, UserX, UserPlus } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import ModalForm from '@/components/ModalForm.vue'
+import { listarUsuarios } from '@/services/usuarios'
 
-// TODO: trocar os dados mockados por chamadas à API
-const perfis = ['Administrador', 'Moderador', 'Participante']
+const perfis = ['Administrador', 'Moderador', 'Participante', 'Usuário']
 
 const periodo = ref('30')
 const busca = ref('')
 const filtroPerfil = ref('')
 const modalAberto = ref(false)
-const itens = ref([
-  { id: 1, nome: 'Marina Duarte', email: 'marina.duarte@email.com', matricula: '2024001', perfil: 'Administrador', ativo: true, dias: 120 },
-  { id: 2, nome: 'Rafael Nogueira', email: 'rafael.nogueira@email.com', matricula: '2024014', perfil: 'Moderador', ativo: true, dias: 64 },
-  { id: 3, nome: 'Camila Prado', email: 'camila.prado@email.com', matricula: '2025032', perfil: 'Participante', ativo: true, dias: 5 },
-  { id: 4, nome: 'Bruno Tavares', email: 'bruno.tavares@email.com', matricula: '2025047', perfil: 'Participante', ativo: false, dias: 3 },
-  { id: 5, nome: 'Letícia Moraes', email: 'leticia.moraes@email.com', matricula: '2025051', perfil: 'Participante', ativo: true, dias: 2 },
-])
+const carregando = ref(false)
+const itens = ref([])
+
+onMounted(async () => {
+  carregando.value = true
+  try {
+    const dados = await listarUsuarios()
+    if (dados && dados.length > 0) {
+      itens.value = dados
+    } else {
+      itens.value = [
+        { id: 1, nome: 'Lucas Oliveira', email: 'lucas.oliveira@email.com', matricula: '0001', perfil: 'Usuário', ativo: true, dias: 7 },
+        { id: 2, nome: 'Mariana Santos', email: 'mariana.santos@email.com', matricula: '0002', perfil: 'Usuário', ativo: true, dias: 7 },
+        { id: 3, nome: 'Pedro Almeida', email: 'pedro.almeida@email.com', matricula: '0003', perfil: 'Usuário', ativo: true, dias: 7 },
+      ]
+    }
+  } catch (err) {
+    console.error('Erro ao carregar usuários:', err)
+  } finally {
+    carregando.value = false
+  }
+})
 
 const totalAtivos = computed(() => itens.value.filter((i) => i.ativo).length)
 const novos = computed(() => itens.value.filter((i) => i.dias <= 7).length)
