@@ -4,6 +4,7 @@ import '@/assets/painel.css'
 import { House, Users, Target, Flag, BookOpen, Settings, Leaf, Search, Bell, LogOut } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { sair } from '@/services/auth'
+import { preferencias } from '@/services/preferencias'
 
 const router = useRouter()
 function deslogar() {
@@ -45,7 +46,7 @@ const menu = [
           <span class="workspace-icone"><Leaf :size="20" /></span>
           <div>
             <small>Workspace</small>
-            <strong>VibeEco Admin</strong>
+            <strong>{{ preferencias.workspace }}</strong>
           </div>
         </div>
 

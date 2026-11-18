@@ -5,6 +5,7 @@ const props = defineProps({
   aberto: Boolean,
   titulo: String,
   descricao: String,
+  salvando: Boolean,
 })
 const emit = defineEmits(['cancelar', 'salvar'])
 
@@ -45,7 +46,7 @@ watch(
 
         <div class="rodape">
           <button type="button" class="btn btn--claro" @click="emit('cancelar')">Cancelar</button>
-          <button type="submit" class="btn btn--verde">Salvar</button>
+          <button type="submit" class="btn btn--verde" :disabled="salvando">{{ salvando ? 'Salvando...' : 'Salvar' }}</button>
         </div>
       </form>
     </div>

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import logo from '@/assets/vibeeco-logo.svg'
 import { entrar as autenticar } from '@/services/auth'
+import { recarregarPreferencias } from '@/services/preferencias'
 
 const router = useRouter()
 const route = useRoute()
@@ -21,8 +22,8 @@ async function entrar() {
   carregando.value = true
   erro.value = ''
   try {
-    // TODO: trocar por chamada à API em services/auth.js
     await autenticar(login.value, senha.value)
+    recarregarPreferencias()
     // Volta para a tela que o usuário tentou abrir, ou vai ao painel
     router.push(route.query.redirect || '/painel')
   } catch (e) {
