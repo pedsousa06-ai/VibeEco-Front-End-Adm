@@ -1,14 +1,13 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
+import { obterPerfil, atualizarPerfil, alterarSenha } from '@/services/auth'
+import { preferencias, salvarPreferencias } from '@/services/preferencias'
 
-// TODO: carregar e salvar pela API
-const perfil = reactive({ nome: 'Marina Duarte', email: 'marina.duarte@email.com', matricula: '2024001' })
-const workspace = reactive({ nome: 'VibeEco Admin' })
-const notificacoes = reactive({
-  cadastros: true,
-  conclusoes: true,
-  relatorio: false,
-})
+// Perfil e senha vêm da API (tabela de administradores).
+// Workspace e notificações ainda não existem no banco: ficam salvos neste navegador (ver services/preferencias.js).
+const perfil = reactive({ id: null, email: '', nivel: '', matricula: '' })
+const carregando = ref(true)
+const salvando = ref('') // nome da seção que está salvando
 const senha = reactive({ atual: '', nova: '', confirmar: '' })
 
 const mensagem = ref({ secao: '', texto: '', erro: false })
@@ -20,19 +19,49 @@ function avisar(secao, texto, erro = false) {
   if (!erro) timer = setTimeout(() => (mensagem.value = { secao: '', texto: '', erro: false }), 4000)
 }
 
-function salvarPerfil() {
-  // TODO: PUT /perfil
-  avisar('perfil', 'Perfil atualizado.')
+function preencherPerfil(adm) {
+  Object.assign(perfil, {
+    id: adm.id,
+    email: adm.email,
+    nivel: adm.nivel_acesso || '',
+    matricula: String(adm.id).padStart(4, '0'),
+  })
 }
+
+onMounted(async () => {
+  try {
+    preencherPerfil(await obterPerfil())
+  } catch (e) {
+    avisar('perfil', e.message || 'Não foi possível carregar o perfil.', true)
+  } finally {
+    carregando.value = false
+  }
+})
+
+async function salvarPerfil() {
+  salvando.value = 'perfil'
+  try {
+    preencherPerfil(await atualizarPerfil(perfil.email))
+    avisar('perfil', 'Perfil atualizado.')
+  } catch (e) {
+    avisar('perfil', e.message || 'Não foi possível atualizar o perfil.', true)
+  } finally {
+    salvando.value = ''
+  }
+}
+
 function salvarWorkspace() {
-  // TODO: PUT /workspace
+  preferencias.workspace = preferencias.workspace.trim() || 'VibeEco Admin'
+  salvarPreferencias()
   avisar('workspace', 'Workspace atualizado.')
 }
+
 function salvarNotificacoes() {
-  // TODO: PUT /notificacoes
+  salvarPreferencias()
   avisar('notificacoes', 'Preferências salvas.')
 }
-function alterarSenha() {
+
+async function trocarSenha() {
   if (senha.nova.length < 8) {
     avisar('senha', 'A nova senha precisa ter pelo menos 8 caracteres.', true)
     return
@@ -41,9 +70,16 @@ function alterarSenha() {
     avisar('senha', 'A confirmação não é igual à nova senha.', true)
     return
   }
-  // TODO: POST /alterar-senha
-  Object.assign(senha, { atual: '', nova: '', confirmar: '' })
-  avisar('senha', 'Senha alterada.')
+  salvando.value = 'senha'
+  try {
+    await alterarSenha(senha.atual, senha.nova)
+    Object.assign(senha, { atual: '', nova: '', confirmar: '' })
+    avisar('senha', 'Senha alterada.')
+  } catch (e) {
+    avisar('senha', e.message || 'Não foi possível alterar a senha.', true)
+  } finally {
+    salvando.value = ''
+  }
 }
 </script>
 
@@ -57,34 +93,43 @@ function alterarSenha() {
     <div class="secoes">
       <form class="secao" @submit.prevent="salvarPerfil">
         <h2>Perfil</h2>
-        <p class="sub">Informações exibidas para os outros administradores.</p>
+        <p class="sub">Dados de acesso da sua conta de administrador.</p>
         <div class="pn-grid-2">
           <label class="pn-campo">
-            <span>Nome completo</span>
-            <input v-model="perfil.nome" type="text" required autocomplete="name" />
+            <span>E-mail</span>
+            <input v-model="perfil.email" type="email" required autocomplete="email" :disabled="carregando" />
           </label>
           <label class="pn-campo">
-            <span>E-mail</span>
-            <input v-model="perfil.email" type="email" required autocomplete="email" />
+            <span>Nível de acesso</span>
+            <input :value="perfil.nivel" type="text" readonly />
           </label>
         </div>
         <label class="pn-campo campo-curto">
           <span>Matrícula</span>
-          <input v-model="perfil.matricula" type="text" readonly aria-describedby="dica-matricula" />
+          <input :value="perfil.matricula" type="text" readonly aria-describedby="dica-matricula" />
           <small id="dica-matricula">A matrícula não pode ser alterada.</small>
         </label>
         <div class="rodape">
-          <button type="submit" class="btn">Salvar perfil</button>
-          <p v-if="mensagem.secao === 'perfil'" class="aviso" role="status">{{ mensagem.texto }}</p>
+          <button type="submit" class="btn" :disabled="carregando || salvando === 'perfil'">
+            {{ salvando === 'perfil' ? 'Salvando...' : 'Salvar perfil' }}
+          </button>
+          <p
+            v-if="mensagem.secao === 'perfil'"
+            class="aviso"
+            :class="{ 'aviso--erro': mensagem.erro }"
+            :role="mensagem.erro ? 'alert' : 'status'"
+          >
+            {{ mensagem.texto }}
+          </p>
         </div>
       </form>
 
       <form class="secao" @submit.prevent="salvarWorkspace">
         <h2>Workspace</h2>
-        <p class="sub">Nome mostrado no menu lateral do painel.</p>
+        <p class="sub">Nome mostrado no menu lateral do painel (salvo neste navegador).</p>
         <label class="pn-campo campo-curto">
           <span>Nome do workspace</span>
-          <input v-model="workspace.nome" type="text" required />
+          <input v-model="preferencias.workspace" type="text" required maxlength="40" />
         </label>
         <div class="rodape">
           <button type="submit" class="btn">Salvar workspace</button>
@@ -94,7 +139,7 @@ function alterarSenha() {
 
       <form class="secao" @submit.prevent="salvarNotificacoes">
         <h2>Notificações</h2>
-        <p class="sub">Escolha quando o painel deve avisar você.</p>
+        <p class="sub">Escolha quando o painel deve avisar você (salvo neste navegador).</p>
         <ul class="interruptores">
           <li>
             <label>
@@ -102,7 +147,7 @@ function alterarSenha() {
                 <strong>Novos cadastros</strong>
                 <small>Aviso quando um usuário se cadastrar.</small>
               </span>
-              <input v-model="notificacoes.cadastros" type="checkbox" role="switch" />
+              <input v-model="preferencias.notificacoes.cadastros" type="checkbox" role="switch" />
             </label>
           </li>
           <li>
@@ -111,7 +156,7 @@ function alterarSenha() {
                 <strong>Missões concluídas</strong>
                 <small>Aviso quando uma missão atingir 100% de conclusão.</small>
               </span>
-              <input v-model="notificacoes.conclusoes" type="checkbox" role="switch" />
+              <input v-model="preferencias.notificacoes.conclusoes" type="checkbox" role="switch" />
             </label>
           </li>
           <li>
@@ -120,7 +165,7 @@ function alterarSenha() {
                 <strong>Relatório semanal</strong>
                 <small>Resumo de engajamento enviado toda segunda-feira.</small>
               </span>
-              <input v-model="notificacoes.relatorio" type="checkbox" role="switch" />
+              <input v-model="preferencias.notificacoes.relatorio" type="checkbox" role="switch" />
             </label>
           </li>
         </ul>
@@ -130,7 +175,7 @@ function alterarSenha() {
         </div>
       </form>
 
-      <form class="secao" @submit.prevent="alterarSenha">
+      <form class="secao" @submit.prevent="trocarSenha">
         <h2>Segurança</h2>
         <p class="sub">Use uma senha com pelo menos 8 caracteres.</p>
         <label class="pn-campo campo-curto">
@@ -140,15 +185,17 @@ function alterarSenha() {
         <div class="pn-grid-2">
           <label class="pn-campo">
             <span>Nova senha</span>
-            <input v-model="senha.nova" type="password" required autocomplete="new-password" />
+            <input v-model="senha.nova" type="password" required minlength="8" maxlength="64" autocomplete="new-password" />
           </label>
           <label class="pn-campo">
             <span>Confirmar nova senha</span>
-            <input v-model="senha.confirmar" type="password" required autocomplete="new-password" />
+            <input v-model="senha.confirmar" type="password" required minlength="8" maxlength="64" autocomplete="new-password" />
           </label>
         </div>
         <div class="rodape">
-          <button type="submit" class="btn">Alterar senha</button>
+          <button type="submit" class="btn" :disabled="salvando === 'senha'">
+            {{ salvando === 'senha' ? 'Alterando...' : 'Alterar senha' }}
+          </button>
           <p
             v-if="mensagem.secao === 'senha'"
             class="aviso"
@@ -236,6 +283,10 @@ h1 {
 }
 .btn:hover {
   background: #0f8f18;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 .btn:focus-visible {
   outline: 3px solid #1fe05a;

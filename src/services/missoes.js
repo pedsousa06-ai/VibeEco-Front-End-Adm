@@ -1,16 +1,37 @@
+
 // src/services/missoes.js
-// Comunicação do painel adm com a API de missões (back-end Node/Express).
-// Defina VITE_API_URL no .env do front, ex.: VITE_API_URL=http://localhost:8080/v1/vibeEco/administrador
-// Helpers (BASE, requisitar, dia, diasEntre, somarDias, hojeLocal) são exportados para o services/desafios.js reutilizar.
-export const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8080/v1/vibeEco/administrador').replace(/\/$/, '')
+// Comunicação do painel administrativo com a API VibeEco.
+
+// ==========================================
+// CONFIGURAÇÃO DA API
+// ==========================================
+
+export const BASE = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8080/v1/vibeEco/administrador'
+).replace(/\/+$/, '')
+
 const URL_MISSAO = `${BASE}/missao`
 
-export async function requisitar(url, opcoes = {}) {
-  let resp
-  const token = localStorage.getItem('vibeeco_token')
-  const headers = {}
+console.log('[VIBEECO] URL BASE DA API:', BASE)
 
-  if (!(opcoes.body instanceof FormData)) {
+// ==========================================
+// COMUNICAÇÃO COM A API
+// ==========================================
+
+export async function requisitar(url, opcoes = {}) {
+  const token = localStorage.getItem('vibeeco_token')
+
+  const headers = {
+    Accept: 'application/json',
+    ...opcoes.headers
+  }
+
+  const ehFormData =
+    typeof FormData !== 'undefined' &&
+    opcoes.body instanceof FormData
+
+  if (opcoes.body && !ehFormData) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -19,68 +40,144 @@ export async function requisitar(url, opcoes = {}) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  if (opcoes.headers) {
-    Object.assign(headers, opcoes.headers)
-  }
+  console.log('[VIBEECO] Requisição:', {
+    url,
+    metodo: opcoes.method || 'GET'
+  })
+
+  let resp
 
   try {
     resp = await fetch(url, {
       ...opcoes,
-      headers,
+      headers
     })
-  } catch {
-    // fetch só lança erro quando nem chegou ao servidor (API desligada, URL errada, CORS)
-    const erro = new Error('Não foi possível conectar à API. Verifique se o servidor está ligado.')
-    erro.status = 0
-    throw erro
+  } catch (erro) {
+    console.error('[VIBEECO] Erro de conexão:', erro)
+
+    const erroAPI = new Error(
+      'Não foi possível conectar à API. Verifique se o servidor está ligado.'
+    )
+
+    erroAPI.status = 0
+    throw erroAPI
   }
 
   let corpo = null
-  try {
-    corpo = await resp.json()
-  } catch {
-    // resposta sem corpo
+
+  const texto = await resp.text()
+
+  if (texto) {
+    try {
+      corpo = JSON.parse(texto)
+    } catch {
+      corpo = { message: texto }
+    }
   }
+
+  console.log('[VIBEECO] Resposta da API:', {
+    url,
+    status: resp.status,
+    corpo
+  })
+
   if (!resp.ok) {
     if (resp.status === 401 && token) {
       localStorage.removeItem('vibeeco_token')
       localStorage.removeItem('vibeeco_user')
+
+      window.dispatchEvent(
+        new CustomEvent('vibeeco:sessao-expirada')
+      )
     }
+
+    const mensagem =
+      corpo?.message ||
+      corpo?.mensagem ||
+      'Erro ao comunicar com o servidor.'
+
     const campo = corpo?.field ? ` ${corpo.field}` : ''
-    const erro = new Error((corpo?.message || 'Erro ao comunicar com o servidor.') + campo)
-    erro.status = resp.status
-    throw erro
+
+    const erroAPI = new Error(mensagem + campo)
+
+    erroAPI.status = resp.status
+    erroAPI.response = corpo
+
+    throw erroAPI
   }
+
   return corpo
 }
 
-// IDs que precisam bater com o banco (rode o 1-sql/seeds_missoes.sql, que cria exatamente estes ids)
-export const ID_DIFICULDADE = { Fácil: 1, Médio: 2, Difícil: 3 }
-export const ID_CATEGORIA = { Reciclagem: 1, Energia: 2, Água: 3, Mobilidade: 4, Alimentação: 5 }
+// ==========================================
+// CONFIGURAÇÕES DE MISSÕES
+// ==========================================
 
-export const dia = (v) => String(v).slice(0, 10) // 'YYYY-MM-DD'
+export const ID_DIFICULDADE = {
+  Fácil: 1,
+  Médio: 2,
+  Difícil: 3
+}
+
+export const ID_CATEGORIA = {
+  Reciclagem: 1,
+  Energia: 2,
+  Água: 3,
+  Mobilidade: 4,
+  Alimentação: 5
+}
+
+// ==========================================
+// MANIPULAÇÃO DE DATAS
+// ==========================================
+
+export const dia = (valor) => String(valor).slice(0, 10)
 
 export function diasEntre(inicio, termino) {
-  const ms = new Date(dia(termino) + 'T00:00:00') - new Date(dia(inicio) + 'T00:00:00')
+  const dataInicio = new Date(
+    dia(inicio) + 'T00:00:00'
+  )
+
+  const dataTermino = new Date(
+    dia(termino) + 'T00:00:00'
+  )
+
+  const ms = dataTermino - dataInicio
+
+  if (Number.isNaN(ms)) return 1
+
   return Math.max(1, Math.round(ms / 86400000))
 }
 
-export function somarDias(data, dias) {
+export function somarDias(data, quantidade) {
   const d = new Date(dia(data) + 'T00:00:00')
-  d.setDate(d.getDate() + Number(dias))
+
+  d.setDate(d.getDate() + Number(quantidade))
+
   const p = (n) => String(n).padStart(2, '0')
+
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
 export function hojeLocal() {
   const d = new Date()
+
   const p = (n) => String(n).padStart(2, '0')
+
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-// API -> formato usado pela tela
+// ==========================================
+// CONVERSÃO DA API PARA A TELA
+// ==========================================
+
 function deApi(m) {
-  const etapas = (m.etapas || []).map((e) => ({ id: e.id, titulo: e.titulo, xp: Number(e.xp) }))
+  const etapas = (m.etapas || []).map((e) => ({
+    id: e.id,
+    titulo: e.titulo,
+    xp: Number(e.xp)
+  }))
+
   return {
     id: m.id,
     titulo: m.nome,
@@ -93,50 +190,66 @@ function deApi(m) {
     moedas: Number(m.coins),
     etapas,
     tipo: 'Individual',
-    data_inicio: dia(m.data_inicio),
+    data_inicio: dia(m.data_inicio)
   }
 }
 
-// tela -> formato esperado pela API (o XP total é a soma das etapas; o back-end também recalcula)
+// ==========================================
+// CONVERSÃO DA TELA PARA A API
+// ==========================================
+
 function paraApi(d) {
   const inicio = d.data_inicio || hojeLocal()
-  const etapas = d.etapas.map((e) => ({
+
+  const etapas = (d.etapas || []).map((e) => ({
     ...(e.id ? { id: e.id } : {}),
-    titulo: String(e.titulo).trim(),
-    xp: Number(e.xp),
+    titulo: String(e.titulo || '').trim(),
+    xp: Number(e.xp)
   }))
+
   return {
-    nome: String(d.titulo).trim(),
-    descricao: String(d.objetivo).trim(),
+    nome: String(d.titulo || '').trim(),
+    descricao: String(d.objetivo || '').trim(),
     dica: String(d.dica || '').trim() || null,
     id_dificuldade: ID_DIFICULDADE[d.dificuldade],
     id_categoria: ID_CATEGORIA[d.categoria] || null,
-    coins: d.moedas,
-    total_xp_missao: etapas.reduce((soma, e) => soma + e.xp, 0),
+    coins: Number(d.moedas) || 0,
+    total_xp_missao: etapas.reduce(
+      (soma, etapa) => soma + etapa.xp,
+      0
+    ),
     data_inicio: inicio,
     data_termino: somarDias(inicio, d.duracao),
-    etapas,
+    etapas
   }
 }
 
+// ==========================================
+// SERVIÇOS DE MISSÕES
+// ==========================================
+
 export async function listarMissoes() {
-  try {
-    const r = await requisitar(URL_MISSAO)
-    return (r.response?.missao || []).map(deApi)
-  } catch (e) {
-    if (e.status === 404) return [] // 404 = nenhuma missão cadastrada
-    throw e
-  }
+  const resposta = await requisitar(URL_MISSAO)
+
+  return (resposta?.response?.missao || []).map(deApi)
 }
 
 export async function criarMissao(dados) {
-  await requisitar(URL_MISSAO, { method: 'POST', body: JSON.stringify(paraApi(dados)) })
+  return await requisitar(URL_MISSAO, {
+    method: 'POST',
+    body: JSON.stringify(paraApi(dados))
+  })
 }
 
 export async function atualizarMissao(id, dados) {
-  await requisitar(`${URL_MISSAO}/${id}`, { method: 'PUT', body: JSON.stringify(paraApi(dados)) })
+  return await requisitar(`${URL_MISSAO}/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(paraApi(dados))
+  })
 }
 
 export async function excluirMissao(id) {
-  await requisitar(`${URL_MISSAO}/${id}`, { method: 'DELETE' })
+  return await requisitar(`${URL_MISSAO}/${id}`, {
+    method: 'DELETE'
+  })
 }
