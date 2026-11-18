@@ -17,8 +17,9 @@ import MissoesView from '@/views/MissoesView.vue'
 import DesafiosView from '@/views/DesafiosView.vue'
 import ConteudosView from '@/views/ConteudosView.vue'
 import UsuariosView from '@/views/UsuariosView.vue'
-import ProgressoView from '@/views/ProgressoView.vue'
+import Progresso from '@/views/Progresso.vue'   // ← o novo, sem duplicar
 import ConfiguracoesView from '@/views/ConfiguracoesView.vue'
+
 
 const router = createRouter({
   history: createWebHistory(),
@@ -48,7 +49,7 @@ const router = createRouter({
         { path: 'tipos-de-missao', name: 'tipos-de-missao', component: GestaoTipos, props: { tipo: 'missao' } },
         { path: 'tipos-de-conteudo', name: 'tipos-de-conteudo', component: GestaoTipos, props: { tipo: 'conteudo' } },
         { path: 'usuarios', name: 'usuarios', component: UsuariosView },
-        { path: 'progresso', name: 'progresso', component: ProgressoView },
+        { path: 'progresso', name: 'progresso', component: Progresso },  // ← aponta pro novo
         { path: 'configuracoes', name: 'configuracoes', component: ConfiguracoesView },
       ],
     },

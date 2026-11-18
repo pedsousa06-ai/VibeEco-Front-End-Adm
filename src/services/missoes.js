@@ -1,4 +1,3 @@
-
 // src/services/missoes.js
 // Comunicação do painel administrativo com a API VibeEco.
 
@@ -171,8 +170,30 @@ export function hojeLocal() {
 // CONVERSÃO DA API PARA A TELA
 // ==========================================
 
+// A API devolve "categoria" como array [{ id, nome }] no listar/buscar.
+// A tela espera uma string simples, então extraímos o nome do primeiro item.
+function extrairNomeCategoria(valor) {
+  if (!valor) return ''
+
+  if (Array.isArray(valor)) {
+    const primeiro = valor[0]
+    if (!primeiro) return ''
+    return typeof primeiro === 'string'
+      ? primeiro
+      : (primeiro.nome || '')
+  }
+
+  if (typeof valor === 'object') return valor.nome || ''
+
+  return String(valor)
+}
+
 function deApi(m) {
-  const etapas = (m.etapas || []).map((e) => ({
+  // O controller devolve as etapas em "missao.etapa" (singular).
+  // Aceitamos "etapa" e "etapas" para manter compatibilidade.
+  const listaEtapas = m.etapa || m.etapas || []
+
+  const etapas = listaEtapas.map((e) => ({
     id: e.id,
     titulo: e.titulo,
     xp: Number(e.xp)
@@ -183,7 +204,7 @@ function deApi(m) {
     titulo: m.nome,
     objetivo: m.descricao || '',
     dica: m.dica || '',
-    categoria: m.categoria || '',
+    categoria: extrairNomeCategoria(m.categoria),
     dificuldade: m.dificuldade || '',
     duracao: diasEntre(m.data_inicio, m.data_termino),
     xp: Number(m.total_xp_missao),
