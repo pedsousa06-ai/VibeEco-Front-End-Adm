@@ -17,7 +17,8 @@ function deApi(d) {
     dificuldade: d.dificuldade || '', // o DAO já devolve o nome pelo join
     duracao: diasEntre(d.data_inicio, d.data_termino),
     moedas: Number(d.super_coins),
-    tipo: 'Individual',
+    tipo: d.tipo || 'Individual', // Individual | Coletivo (vem do banco)
+    meta: d.meta_participantes ?? null,
     data_inicio: dia(d.data_inicio),
   }
 }
