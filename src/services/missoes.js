@@ -7,7 +7,7 @@
 
 export const BASE = (
   import.meta.env.VITE_API_URL ||
-  'http://localhost:8080/v1/vibeEco/administrador'
+  'http://localhost:8081/v1/vibeEco/administrador'
 ).replace(/\/+$/, '')
 
 const URL_MISSAO = `${BASE}/missao`
