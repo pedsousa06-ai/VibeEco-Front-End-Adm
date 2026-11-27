@@ -2,6 +2,12 @@
 
 .pn-pagina {
   max-width: 1080px;
+  margin-inline: auto;
+}
+@media (min-width: 1500px) {
+  .pn-pagina {
+    max-width: 1280px;
+  }
 }
 
 /* Botões de aba: Cadastrar / Mostrar todos */

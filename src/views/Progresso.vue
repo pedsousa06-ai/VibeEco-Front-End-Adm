@@ -136,7 +136,8 @@ watch(periodo, carregar)
 </template>
 
 <style scoped>
-.progresso { max-width: 1080px; }
+.progresso { max-width: 1080px; margin-inline: auto; }
+@media (min-width: 1500px) { .progresso { max-width: 1280px; } }
 h1 { margin: 0; font-size: 32px; color: #14301f; }
 .descricao { margin: 4px 0 0; font-size: 15px; color: #5b6f62; }
 .cabecalho { display: flex; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; }
@@ -169,6 +170,10 @@ tr:last-child td { border-bottom: none; }
 .girar { animation: girar 1s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
 
+.tabela-cartao { overflow-x: auto; }
+@media (max-width: 1100px) {
+  .metricas { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 768px) {
   .metricas, .graficos { grid-template-columns: 1fr; }
 }
