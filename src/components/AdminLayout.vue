@@ -103,7 +103,7 @@ const menu = [
   justify-content: space-between;
   gap: 16px;
   height: 88px;
-  padding: 0 32px 0 56px;
+  padding: 0 max(clamp(16px, 2.5vw, 32px), calc((100% - 1840px) / 2 + 32px)) 0 max(clamp(16px, 4vw, 56px), calc((100% - 1840px) / 2 + 56px));
   background: var(--verde-escuro);
 }
 .topo-logo img {
@@ -170,8 +170,12 @@ const menu = [
   flex: 1;
   display: flex;
   align-items: flex-start;
-  gap: 48px;
-  padding: 24px 32px 24px 24px;
+  gap: clamp(24px, 3vw, 48px);
+  width: 100%;
+  max-width: 1840px; /* monitores largos: o painel não estica sem fim */
+  margin-inline: auto;
+  padding: 24px clamp(16px, 2.5vw, 32px) 24px clamp(16px, 2vw, 24px);
+  box-sizing: border-box;
 }
 
 /* Menu lateral */
@@ -293,6 +297,26 @@ const menu = [
   }
   .conteudo {
     width: 100%;
+  }
+}
+@media (max-width: 520px) {
+  .topo {
+    height: 72px;
+    gap: 10px;
+  }
+  .topo-logo img {
+    height: 32px;
+  }
+  .topo-busca {
+    max-width: 58vw;
+  }
+  .menu-item {
+    flex-basis: 120px;
+    height: 44px;
+  }
+  .rodape {
+    padding: 0 12px;
+    text-align: center;
   }
 }
 </style>

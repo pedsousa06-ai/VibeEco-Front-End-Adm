@@ -206,7 +206,8 @@ const subtituloAtualizado = computed(() =>
 </template>
 
 <style scoped>
-.inicio { max-width: 1080px; }
+.inicio { max-width: 1080px; margin-inline: auto; }
+@media (min-width: 1500px) { .inicio { max-width: 1280px; } }
 
 h1 { margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700; color: #14301f; }
 h2 { margin: 0; font-size: 24px; font-weight: 700; color: #14301f; }
@@ -243,7 +244,7 @@ h2 { margin: 0; font-size: 24px; font-weight: 700; color: #14301f; }
 @keyframes girar { to { transform: rotate(360deg); } }
 
 .metricas {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
   gap: 18px; margin-bottom: 40px;
 }
 .metrica-cartao {
@@ -295,7 +296,7 @@ h2 { margin: 0; font-size: 24px; font-weight: 700; color: #14301f; }
 .sk-nota { display: block; margin: 10px 4px 0; width: 80%; height: 12px; }
 
 .atalhos {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 18px; margin-top: 20px;
 }
 .atalho {
